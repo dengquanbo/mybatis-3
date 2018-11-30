@@ -32,64 +32,67 @@ import org.apache.ibatis.session.defaults.DefaultSqlSessionFactory;
  */
 public class SqlSessionFactoryBuilder {
 
-  public SqlSessionFactory build(Reader reader) {
-    return build(reader, null, null);
-  }
+	public SqlSessionFactory build(Reader reader) {
+		return build(reader, null, null);
+	}
 
-  public SqlSessionFactory build(Reader reader, String environment) {
-    return build(reader, environment, null);
-  }
+	public SqlSessionFactory build(Reader reader, String environment) {
+		return build(reader, environment, null);
+	}
 
-  public SqlSessionFactory build(Reader reader, Properties properties) {
-    return build(reader, null, properties);
-  }
+	public SqlSessionFactory build(Reader reader, Properties properties) {
+		return build(reader, null, properties);
+	}
 
-  public SqlSessionFactory build(Reader reader, String environment, Properties properties) {
-    try {
-      XMLConfigBuilder parser = new XMLConfigBuilder(reader, environment, properties);
-      return build(parser.parse());
-    } catch (Exception e) {
-      throw ExceptionFactory.wrapException("Error building SqlSession.", e);
-    } finally {
-      ErrorContext.instance().reset();
-      try {
-        reader.close();
-      } catch (IOException e) {
-        // Intentionally ignore. Prefer previous error.
-      }
-    }
-  }
+	public SqlSessionFactory build(Reader reader, String environment, Properties properties) {
+		try {
+			// 创建 XMLConfigBuilder 对象
+			XMLConfigBuilder parser = new XMLConfigBuilder(reader, environment, properties);
+			// 执行 XML 解析
+			// 创建 DefualtSqlSessionFactory 对象
+			return build(parser.parse());
+		} catch (Exception e) {
+			throw ExceptionFactory.wrapException("Error building SqlSession.", e);
+		} finally {
+			ErrorContext.instance().reset();
+			try {
+				reader.close();
+			} catch (IOException e) {
+				// Intentionally ignore. Prefer previous error.
+			}
+		}
+	}
 
-  public SqlSessionFactory build(InputStream inputStream) {
-    return build(inputStream, null, null);
-  }
+	public SqlSessionFactory build(InputStream inputStream) {
+		return build(inputStream, null, null);
+	}
 
-  public SqlSessionFactory build(InputStream inputStream, String environment) {
-    return build(inputStream, environment, null);
-  }
+	public SqlSessionFactory build(InputStream inputStream, String environment) {
+		return build(inputStream, environment, null);
+	}
 
-  public SqlSessionFactory build(InputStream inputStream, Properties properties) {
-    return build(inputStream, null, properties);
-  }
+	public SqlSessionFactory build(InputStream inputStream, Properties properties) {
+		return build(inputStream, null, properties);
+	}
 
-  public SqlSessionFactory build(InputStream inputStream, String environment, Properties properties) {
-    try {
-      XMLConfigBuilder parser = new XMLConfigBuilder(inputStream, environment, properties);
-      return build(parser.parse());
-    } catch (Exception e) {
-      throw ExceptionFactory.wrapException("Error building SqlSession.", e);
-    } finally {
-      ErrorContext.instance().reset();
-      try {
-        inputStream.close();
-      } catch (IOException e) {
-        // Intentionally ignore. Prefer previous error.
-      }
-    }
-  }
-    
-  public SqlSessionFactory build(Configuration config) {
-    return new DefaultSqlSessionFactory(config);
-  }
+	public SqlSessionFactory build(InputStream inputStream, String environment, Properties properties) {
+		try {
+			XMLConfigBuilder parser = new XMLConfigBuilder(inputStream, environment, properties);
+			return build(parser.parse());
+		} catch (Exception e) {
+			throw ExceptionFactory.wrapException("Error building SqlSession.", e);
+		} finally {
+			ErrorContext.instance().reset();
+			try {
+				inputStream.close();
+			} catch (IOException e) {
+				// Intentionally ignore. Prefer previous error.
+			}
+		}
+	}
+
+	public SqlSessionFactory build(Configuration config) {
+		return new DefaultSqlSessionFactory(config);
+	}
 
 }
