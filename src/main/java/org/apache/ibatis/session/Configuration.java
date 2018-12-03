@@ -79,20 +79,27 @@ import org.apache.ibatis.type.TypeHandlerRegistry;
  * @author Clinton Begin
  */
 public class Configuration {
-
+	// 标识已加载的mapper
 	protected final MapperRegistry mapperRegistry = new MapperRegistry(this);
 	protected final InterceptorChain interceptorChain = new InterceptorChain();
 	protected final TypeHandlerRegistry typeHandlerRegistry = new TypeHandlerRegistry();
 	protected final TypeAliasRegistry typeAliasRegistry = new TypeAliasRegistry();
 	protected final LanguageDriverRegistry languageRegistry = new LanguageDriverRegistry();
 	protected final Map<String, MappedStatement> mappedStatements = new StrictMap<>("Mapped Statements collection");
+	// Cache 对象集合，KEY：命名空间 namespace
 	protected final Map<String, Cache> caches = new StrictMap<>("Caches collection");
 	protected final Map<String, ResultMap> resultMaps = new StrictMap<>("Result Maps collection");
 	protected final Map<String, ParameterMap> parameterMaps = new StrictMap<>("Parameter Maps collection");
 	protected final Map<String, KeyGenerator> keyGenerators = new StrictMap<>("Key Generators collection");
+
+	// 标识已加载的资源
 	protected final Set<String> loadedResources = new HashSet<>();
 	protected final Map<String, XNode> sqlFragments = new StrictMap<>("XML fragments parsed from previous mappers");
+
+	// 解析失败的 <select />、<insert />、<update />、<delete /> 节点集合
 	protected final Collection<XMLStatementBuilder> incompleteStatements = new LinkedList<>();
+
+	// CacheRefResolver 集合
 	protected final Collection<CacheRefResolver> incompleteCacheRefs = new LinkedList<>();
 	protected final Collection<ResultMapResolver> incompleteResultMaps = new LinkedList<>();
 	protected final Collection<MethodResolver> incompleteMethods = new LinkedList<>();
@@ -281,6 +288,9 @@ public class Configuration {
 		loadedResources.add(resource);
 	}
 
+	/**
+	 * 已加载资源( Resource )集合
+	 */
 	public boolean isResourceLoaded(String resource) {
 		return loadedResources.contains(resource);
 	}
@@ -608,8 +618,11 @@ public class Configuration {
 	}
 
 	public void addResultMap(ResultMap rm) {
+		// 添加到 resultMaps 中
 		resultMaps.put(rm.getId(), rm);
+		// 遍历全局的 ResultMap 集合，若其拥有 Discriminator 对象，则判断是否强制标记为有内嵌的 ResultMap
 		checkLocallyForDiscriminatedNestedResultMaps(rm);
+		// 若传入的 ResultMap 不存在内嵌 ResultMap 并且有 Discriminator ，则判断是否需要强制表位有内嵌的 ResultMap
 		checkGloballyForDiscriminatedNestedResultMaps(rm);
 	}
 
@@ -746,6 +759,13 @@ public class Configuration {
 		return mappedStatements.containsKey(statementName);
 	}
 
+	/**
+	 *
+	 * @param namespace
+	 *            <mapper namespace/>定义的namespace
+	 * @param referencedNamespace
+	 *            <cache-ref namespace=/> 定义的namespace
+	 */
 	public void addCacheRef(String namespace, String referencedNamespace) {
 		cacheRefMap.put(namespace, referencedNamespace);
 	}
@@ -821,12 +841,17 @@ public class Configuration {
 
 	// Slow but a one time cost. A better solution is welcome.
 	protected void checkGloballyForDiscriminatedNestedResultMaps(ResultMap rm) {
+		// 如果传入的 ResultMap 有内嵌的 ResultMap
 		if (rm.hasNestedResultMaps()) {
+			// 遍历全局的 ResultMap 集合
 			for (Map.Entry<String, ResultMap> entry : resultMaps.entrySet()) {
 				Object value = entry.getValue();
 				if (value instanceof ResultMap) {
 					ResultMap entryResultMap = (ResultMap) value;
+					// 判断遍历的全局的 entryResultMap 不存在内嵌 ResultMap 并且有 Discriminator
 					if (!entryResultMap.hasNestedResultMaps() && entryResultMap.getDiscriminator() != null) {
+						// 判断是否 Discriminator 的 ResultMap 集合中，使用了传入的 ResultMap 。
+						// 如果是，则标记为有内嵌的 ResultMap
 						Collection<String> discriminatedResultMapNames = entryResultMap.getDiscriminator()
 								.getDiscriminatorMap().values();
 						if (discriminatedResultMapNames.contains(rm.getId())) {
@@ -840,10 +865,13 @@ public class Configuration {
 
 	// Slow but a one time cost. A better solution is welcome.
 	protected void checkLocallyForDiscriminatedNestedResultMaps(ResultMap rm) {
+		// 如果传入的 ResultMap 不存在内嵌 ResultMap 并且有 Discriminator
 		if (!rm.hasNestedResultMaps() && rm.getDiscriminator() != null) {
+			// 遍历传入的 ResultMap 的 Discriminator 的 ResultMap 集合
 			for (Map.Entry<String, String> entry : rm.getDiscriminator().getDiscriminatorMap().entrySet()) {
 				String discriminatedResultMapName = entry.getValue();
 				if (hasResultMap(discriminatedResultMapName)) {
+					// 如果引用的 ResultMap 存在内嵌 ResultMap ，则标记传入的 ResultMap 存在内嵌 ResultMap
 					ResultMap discriminatedResultMap = resultMaps.get(discriminatedResultMapName);
 					if (discriminatedResultMap.hasNestedResultMaps()) {
 						rm.forceNestedResultMaps();

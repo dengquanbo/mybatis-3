@@ -22,11 +22,23 @@
 
 <mapper namespace="org.apache.ibatis.domain.blog.mappers.AuthorMapper">
 
-	<parameterMap id="selectAuthor" type="org.apache.ibatis.domain.blog.Author">
+	<cache-ref namespace="dqb"/>
+	<cache></cache>
+
+	<parameterMap id="selectAuthor" type="org.apache.ibatis.domain.blog.Author"  >
 		<parameter property="id" />
 	</parameterMap>
 
-	<resultMap id="selectAuthor" type="org.apache.ibatis.domain.blog.Author">
+	<resultMap id="complexAuthorId" type="org.apache.ibatis.domain.blog.ComplexImmutableAuthorId">
+		<constructor>
+			<idArg column="id" javaType="_int" />
+			<idArg column="username" javaType="string" />
+			<idArg column="password" javaType="string" />
+			<idArg column="email" javaType="string" />
+		</constructor>
+	</resultMap>
+
+	<resultMap id="selectAuthor" type="org.apache.ibatis.domain.blog.Author" >
 		<id column="id" property="id" />
 		<result property="username" column="username" />
 		<result property="password" column="password" />
@@ -46,14 +58,7 @@
 		</constructor>
 	</resultMap>
 
-	<resultMap id="complexAuthorId" type="org.apache.ibatis.domain.blog.ComplexImmutableAuthorId">
-		<constructor>
-			<idArg column="id" javaType="_int" />
-			<idArg column="username" javaType="string" />
-			<idArg column="password" javaType="string" />
-			<idArg column="email" javaType="string" />
-		</constructor>
-	</resultMap>
+
 
 	<resultMap id="selectComplexImmutableAuthor" type="org.apache.ibatis.domain.blog.ComplexImmutableAuthor">
 		<constructor>
