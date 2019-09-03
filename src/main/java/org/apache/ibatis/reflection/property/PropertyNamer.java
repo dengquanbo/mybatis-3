@@ -1,59 +1,90 @@
 /**
- *    Copyright 2009-2015 the original author or authors.
+ * Copyright 2009-2015 the original author or authors.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.ibatis.reflection.property;
 
 import java.util.Locale;
-
 import org.apache.ibatis.reflection.ReflectionException;
 
 /**
+ * 属性名相关的工具类
+ *
  * @author Clinton Begin
  */
 public final class PropertyNamer {
 
-  private PropertyNamer() {
-    // Prevent Instantiation of Static Class
-  }
-
-  public static String methodToProperty(String name) {
-    if (name.startsWith("is")) {
-      name = name.substring(2);
-    } else if (name.startsWith("get") || name.startsWith("set")) {
-      name = name.substring(3);
-    } else {
-      throw new ReflectionException("Error parsing property name '" + name + "'.  Didn't start with 'is', 'get' or 'set'.");
+    private PropertyNamer() {
+        // Prevent Instantiation of Static Class
     }
 
-    if (name.length() == 1 || (name.length() > 1 && !Character.isUpperCase(name.charAt(1)))) {
-      name = name.substring(0, 1).toLowerCase(Locale.ENGLISH) + name.substring(1);
+    /**
+     * 根据方法名，获得对应的属性名
+     *
+     * @param name 方法名
+     * @return 属性名
+     */
+    public static String methodToProperty(String name) {
+        // is 方法，则截取 2 个字符后的内容
+        if (name.startsWith("is")) {
+            name = name.substring(2);
+        }
+        // get 或者 set 方法，则截取 3 个字符后的内容
+        else if (name.startsWith("get") || name.startsWith("set")) {
+            name = name.substring(3);
+        }
+        // 其他方法，抛出异常，因为只能处理 is、set、get 方法
+        else {
+            throw new ReflectionException(
+                "Error parsing property name '" + name + "'.  Didn't start with 'is', 'get' or 'set'.");
+        }
+
+        // 1.属性只有一个字符
+        // 2.属性大于一个字符且首字母不是小写的
+        // 则设置首字母小写
+        if (name.length() == 1 || (name.length() > 1 && !Character.isUpperCase(name.charAt(1)))) {
+            name = name.substring(0, 1).toLowerCase(Locale.ENGLISH) + name.substring(1);
+        }
+
+        return name;
     }
 
-    return name;
-  }
+    /**
+     * 判断是否为 is、get、set 方法
+     *
+     * @param name 方法名
+     * @return 是否
+     */
+    public static boolean isProperty(String name) {
+        return name.startsWith("get") || name.startsWith("set") || name.startsWith("is");
+    }
 
-  public static boolean isProperty(String name) {
-    return name.startsWith("get") || name.startsWith("set") || name.startsWith("is");
-  }
+    /**
+     * 判断是否为 get、is 方法
+     *
+     * @param name 方法名
+     * @return 是否
+     */
+    public static boolean isGetter(String name) {
+        return name.startsWith("get") || name.startsWith("is");
+    }
 
-  public static boolean isGetter(String name) {
-    return name.startsWith("get") || name.startsWith("is");
-  }
-
-  public static boolean isSetter(String name) {
-    return name.startsWith("set");
-  }
+    /**
+     * 判断是否为 set 方法
+     *
+     * @param name 方法名
+     * @return 是否
+     */
+    public static boolean isSetter(String name) {
+        return name.startsWith("set");
+    }
 
 }
