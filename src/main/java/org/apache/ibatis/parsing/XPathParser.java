@@ -56,6 +56,8 @@ public class XPathParser {
 
     /**
      * 变量 Properties 对象
+     *
+     * mybatis-config.xml 中 <properties/> 标签定义的键值对集合
      */
     private Properties variables;
 
