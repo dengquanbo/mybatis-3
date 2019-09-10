@@ -24,7 +24,7 @@ import org.apache.ibatis.reflection.wrapper.ObjectWrapper;
 import org.apache.ibatis.reflection.wrapper.ObjectWrapperFactory;
 
 /**
- *
+ * 对 ObjectMapper 的进一步增强
  *
  * @author Clinton Begin
  */

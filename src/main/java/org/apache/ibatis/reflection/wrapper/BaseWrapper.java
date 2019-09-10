@@ -87,6 +87,13 @@ public abstract class BaseWrapper implements ObjectWrapper {
         }
     }
 
+    /**
+     * 设置集合中指定位置的值
+     *
+     * @param prop PropertyTokenizer 对象
+     * @param collection 集合
+     * @param value 值
+     */
     protected void setCollectionValue(PropertyTokenizer prop, Object collection, Object value) {
         if (collection instanceof Map) {
             ((Map) collection).put(prop.getIndex(), value);
