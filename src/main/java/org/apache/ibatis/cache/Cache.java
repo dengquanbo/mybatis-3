@@ -1,11 +1,11 @@
 /**
- * Copyright 2009-2015 the original author or authors.
- *
+ * Copyright 2009-2019 the original author or authors.
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
@@ -15,12 +15,14 @@ package org.apache.ibatis.cache;
 import java.util.concurrent.locks.ReadWriteLock;
 
 /**
+ * 基于装饰者设计模式
+ * <p>
  * SPI for cache providers.
- *
+ * <p>
  * One instance of cache will be created for each namespace.
- *
+ * <p>
  * The cache implementation must have a constructor that receives the cache id as an String parameter.
- *
+ * <p>
  * MyBatis will pass the namespace as id to the constructor.
  *
  * <pre>
@@ -46,7 +48,7 @@ public interface Cache {
     /**
      * 添加指定键的值
      *
-     * @param key Can be any object but usually it is a {@link CacheKey}
+     * @param key   Can be any object but usually it is a {@link CacheKey}
      * @param value The result of a select.
      */
     void putObject(Object key, Object value);
@@ -61,16 +63,11 @@ public interface Cache {
 
     /**
      * 移除指定键的值
-     *
-     * As of 3.3.0 this method is only called during a rollback
-     * for any previous value that was missing in the cache.
-     * This lets any blocking cache to release the lock that
-     * may have previously put on the key.
-     * A blocking cache puts a lock when a value is null
-     * and releases it when the value is back again.
-     * This way other threads will wait for the value to be
-     * available instead of hitting the database.
-     *
+     * <p>
+     * As of 3.3.0 this method is only called during a rollback for any previous value that was missing in the cache.
+     * This lets any blocking cache to release the lock that may have previously put on the key. A blocking cache puts a
+     * lock when a value is null and releases it when the value is back again. This way other threads will wait for the
+     * value to be available instead of hitting the database.
      *
      * @param key The key
      * @return Not used
@@ -79,14 +76,14 @@ public interface Cache {
 
     /**
      * 清空缓存
-     *
+     * <p>
      * Clears this cache instance
      */
     void clear();
 
     /**
      * 获得容器中缓存的数量
-     *
+     * <p>
      * Optional. This method is not called by the core.
      *
      * @return The number of elements stored in the cache (not its capacity).
@@ -95,9 +92,9 @@ public interface Cache {
 
     /**
      * 获得读取写锁。从 3.2.6 版本开始，该方法不在调用
-     *
+     * <p>
      * Optional. As of 3.2.6 this method is no longer called by the core.
-     *
+     * <p>
      * Any locking needed by the cache must be provided internally by the cache provider.
      *
      * @return A ReadWriteLock

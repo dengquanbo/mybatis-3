@@ -1,11 +1,11 @@
 /**
- * Copyright 2009-2018 the original author or authors.
- *
+ * Copyright 2009-2019 the original author or authors.
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+
 import org.apache.ibatis.reflection.invoker.GetFieldInvoker;
 import org.apache.ibatis.reflection.invoker.Invoker;
 import org.apache.ibatis.reflection.invoker.MethodInvoker;
@@ -59,28 +60,28 @@ public class Reflector {
 
     /**
      * 属性对应的 setting 方法的映射。
-     *
+     * <p>
      * key 为属性名称 value 为 Invoker 对象
      */
     private final Map<String, Invoker> setMethods = new HashMap<>();
 
     /**
      * 属性对应的 getting 方法的映射。
-     *
+     * <p>
      * key 为属性名称 value 为 Invoker 对象
      */
     private final Map<String, Invoker> getMethods = new HashMap<>();
 
     /**
      * 属性对应的 setting 方法的方法参数类型的映射。{@link #setMethods}
-     *
+     * <p>
      * key 为属性名称 value 为方法参数类型
      */
     private final Map<String, Class<?>> setTypes = new HashMap<>();
 
     /**
      * 属性对应的 getting 方法的返回值类型的映射。{@link #getMethods}
-     *
+     * <p>
      * key 为属性名称 value 为返回值的类型
      */
     private final Map<String, Class<?>> getTypes = new HashMap<>();
@@ -170,12 +171,12 @@ public class Reflector {
             // 以 get 和 is 方法名开头，说明是 getting 方法
             String name = method.getName();
             if ((name.startsWith("get") && name.length() > 3)
-                || (name.startsWith("is") && name.length() > 2)) {
+                    || (name.startsWith("is") && name.length() > 2)) {
 
-                // 获得属性
+                // 从方法名，获得属性，如 getId()，则属性为 id
                 name = PropertyNamer.methodToProperty(name);
 
-                // 添加到 conflictingGetters 中
+                // 把属性相关的方法添加到同一个list中,如 id -> ["java.lang.Object#getId","java.lang.Long#getId" ] 对应多个 get 方法
                 addMethodConflict(conflictingGetters, name, method);
             }
         }
@@ -203,16 +204,18 @@ public class Reflector {
                 Class<?> winnerType = winner.getReturnType();
                 Class<?> candidateType = candidate.getReturnType();
 
-                // 返回值类型相同
-                // ReflectorTest#shouldAllowTwoBooleanGetters
+                /**
+                 * 返回值类型相同
+                 * {@link ReflectorTest#shouldAllowTwoBooleanGetters}
+                 */
                 if (candidateType.equals(winnerType)) {
-                    // 这里说明不可能存在两个相同的 getter 方法，
-                    // 继承的类，在 getClassMethods  已完成合并
+                    // 这里说明不可能存在两个相同的 getter 方法，继承的类，在 getClassMethods 已完成合并
                     if (!boolean.class.equals(candidateType)) {
                         throw new ReflectionException(
-                            "Illegal overloaded getter method with ambiguous type for property "
-                                + propName + " in class " + winner.getDeclaringClass()
-                                + ". This breaks the JavaBeans specification and can cause unpredictable results.");
+                                "Illegal overloaded getter method with ambiguous type for property "
+                                        + propName + " in class " + winner.getDeclaringClass()
+                                        + ". This breaks the JavaBeans specification and can cause unpredictable " +
+                                        "results.");
                     }
                     // 选择 boolean 类型的 is 方法
                     else if (candidate.getName().startsWith("is")) {
@@ -231,9 +234,9 @@ public class Reflector {
                 // 返回类型冲突，抛出 ReflectionException 异常
                 else {
                     throw new ReflectionException(
-                        "Illegal overloaded getter method with ambiguous type for property "
-                            + propName + " in class " + winner.getDeclaringClass()
-                            + ". This breaks the JavaBeans specification and can cause unpredictable results.");
+                            "Illegal overloaded getter method with ambiguous type for property "
+                                    + propName + " in class " + winner.getDeclaringClass()
+                                    + ". This breaks the JavaBeans specification and can cause unpredictable results.");
                 }
             }
             addGetMethod(propName, winner);
@@ -243,7 +246,8 @@ public class Reflector {
     private void addGetMethod(String name, Method method) {
         // 有效的属性
         if (isValidPropertyName(name)) {
-            // 在这里记录 getter 方法
+
+            // 在这里记录 getter 方法，get 方法会被封装成 MethodInvoker
             getMethods.put(name, new MethodInvoker(method));
 
             // 参考：https://juejin.im/post/5adefaba518825670e5cb44d
@@ -283,7 +287,7 @@ public class Reflector {
 
     /**
      * 解决 setting 冲突方法
-     *
+     * <p>
      * 遍历每个属性，查找其最匹配的方法。因为子类可以覆写父类的方法，所以一个属性，可能对应多个 setting 方法
      */
     private void resolveSetterConflicts(Map<String, List<Method>> conflictingSetters) {
@@ -327,8 +331,8 @@ public class Reflector {
     }
 
     /**
-     * @param setter1 当前合适的方法
-     * @param setter2 需要比较的方法
+     * @param setter1  当前合适的方法
+     * @param setter2  需要比较的方法
      * @param property 属性
      */
     private Method pickBetterSetter(Method setter1, Method setter2, String property) {
@@ -343,8 +347,8 @@ public class Reflector {
             return setter1;
         }
         throw new ReflectionException("Ambiguous setters defined for property '" + property + "' in class '"
-            + setter2.getDeclaringClass() + "' with types '" + paramType1.getName() + "' and '"
-            + paramType2.getName() + "'.");
+                + setter2.getDeclaringClass() + "' with types '" + paramType1.getName() + "' and '"
+                + paramType2.getName() + "'.");
     }
 
     /**
@@ -445,6 +449,7 @@ public class Reflector {
         Map<String, Method> uniqueMethods = new HashMap<>();
         Class<?> currentClass = cls;
         while (currentClass != null && currentClass != Object.class) {
+            // 通过反射拿到所有方法
             addUniqueMethods(uniqueMethods, currentClass.getDeclaredMethods());
 
             // we also need to look for interface methods -
@@ -453,10 +458,13 @@ public class Reflector {
             // 由于类可能是 abstract 的抽象类，所以需要记录接口中定义的方法
             Class<?>[] interfaces = currentClass.getInterfaces();
             for (Class<?> anInterface : interfaces) {
+                /**
+                 * 这里接口使用了泛型，则使用Object，{@link ReflectorTest#testGetSetterType} 调试下
+                 */
                 addUniqueMethods(uniqueMethods, anInterface.getMethods());
             }
 
-            // 循环父类
+            // 递归父类
             currentClass = currentClass.getSuperclass();
         }
 
@@ -488,7 +496,7 @@ public class Reflector {
 
     /**
      * 格式：returnType#方法名:参数名1,参数名2,参数名3
-     *
+     * <p>
      * 例如：void#checkPackageAccess:java.lang.ClassLoader,boolean
      */
     private String getSignature(Method method) {
@@ -536,7 +544,7 @@ public class Reflector {
         Invoker method = setMethods.get(propertyName);
         if (method == null) {
             throw new ReflectionException(
-                "There is no setter for property named '" + propertyName + "' in '" + type + "'");
+                    "There is no setter for property named '" + propertyName + "' in '" + type + "'");
         }
         return method;
     }
@@ -545,7 +553,7 @@ public class Reflector {
         Invoker method = getMethods.get(propertyName);
         if (method == null) {
             throw new ReflectionException(
-                "There is no getter for property named '" + propertyName + "' in '" + type + "'");
+                    "There is no getter for property named '" + propertyName + "' in '" + type + "'");
         }
         return method;
     }
@@ -560,7 +568,7 @@ public class Reflector {
         Class<?> clazz = setTypes.get(propertyName);
         if (clazz == null) {
             throw new ReflectionException(
-                "There is no setter for property named '" + propertyName + "' in '" + type + "'");
+                    "There is no setter for property named '" + propertyName + "' in '" + type + "'");
         }
         return clazz;
     }
@@ -575,7 +583,7 @@ public class Reflector {
         Class<?> clazz = getTypes.get(propertyName);
         if (clazz == null) {
             throw new ReflectionException(
-                "There is no getter for property named '" + propertyName + "' in '" + type + "'");
+                    "There is no getter for property named '" + propertyName + "' in '" + type + "'");
         }
         return clazz;
     }

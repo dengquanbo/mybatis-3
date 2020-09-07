@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2018 the original author or authors.
+ *    Copyright 2009-2019 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -18,73 +18,86 @@ package org.apache.ibatis.cache.decorators;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.concurrent.locks.ReadWriteLock;
-
 import org.apache.ibatis.cache.Cache;
 
 /**
+ * 先入先出的 cache
+ *
  * FIFO (first in, first out) cache decorator
  *
  * @author Clinton Begin
  */
 public class FifoCache implements Cache {
 
-  private final Cache delegate;
-  private final Deque<Object> keyList;
-  private int size;
+    /**
+     * 装饰 cache
+     */
+    private final Cache delegate;
+    /**
+     * 使用 Deque，作为队列
+     */
+    private final Deque<Object> keyList;
+    private int size;
 
-  public FifoCache(Cache delegate) {
-    this.delegate = delegate;
-    this.keyList = new LinkedList<>();
-    this.size = 1024;
-  }
-
-  @Override
-  public String getId() {
-    return delegate.getId();
-  }
-
-  @Override
-  public int getSize() {
-    return delegate.getSize();
-  }
-
-  public void setSize(int size) {
-    this.size = size;
-  }
-
-  @Override
-  public void putObject(Object key, Object value) {
-    cycleKeyList(key);
-    delegate.putObject(key, value);
-  }
-
-  @Override
-  public Object getObject(Object key) {
-    return delegate.getObject(key);
-  }
-
-  @Override
-  public Object removeObject(Object key) {
-    return delegate.removeObject(key);
-  }
-
-  @Override
-  public void clear() {
-    delegate.clear();
-    keyList.clear();
-  }
-
-  @Override
-  public ReadWriteLock getReadWriteLock() {
-    return null;
-  }
-
-  private void cycleKeyList(Object key) {
-    keyList.addLast(key);
-    if (keyList.size() > size) {
-      Object oldestKey = keyList.removeFirst();
-      delegate.removeObject(oldestKey);
+    public FifoCache(Cache delegate) {
+        this.delegate = delegate;
+        this.keyList = new LinkedList<>();
+        this.size = 1024;
     }
-  }
+
+    @Override
+    public String getId() {
+        return delegate.getId();
+    }
+
+    @Override
+    public int getSize() {
+        return delegate.getSize();
+    }
+
+    /**
+     * 我们可以看到构造方法不支持传入缓存大小，所以可以通过该方法设置缓存大小
+     */
+    public void setSize(int size) {
+        this.size = size;
+    }
+
+    @Override
+    public void putObject(Object key, Object value) {
+        // 检查缓存数量是否大于 size
+        cycleKeyList(key);
+        delegate.putObject(key, value);
+    }
+
+    @Override
+    public Object getObject(Object key) {
+        return delegate.getObject(key);
+    }
+
+    @Override
+    public Object removeObject(Object key) {
+        return delegate.removeObject(key);
+    }
+
+    @Override
+    public void clear() {
+        delegate.clear();
+        keyList.clear();
+    }
+
+    @Override
+    public ReadWriteLock getReadWriteLock() {
+        return null;
+    }
+
+    private void cycleKeyList(Object key) {
+        keyList.addLast(key);
+        if (keyList.size() > size) {
+            // 获得最久插入的 key
+            Object oldestKey = keyList.removeFirst();
+            // 移除即可
+            delegate.removeObject(oldestKey);
+        }
+    }
 
 }

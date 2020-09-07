@@ -1,17 +1,14 @@
 /**
- *    Copyright 2009-2018 the original author or authors.
- *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Copyright 2009-2018 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.ibatis.builder.annotation;
 
@@ -97,580 +94,867 @@ import org.apache.ibatis.type.UnknownTypeHandler;
  */
 public class MapperAnnotationBuilder {
 
-  private static final Set<Class<? extends Annotation>> SQL_ANNOTATION_TYPES = new HashSet<>();
-  private static final Set<Class<? extends Annotation>> SQL_PROVIDER_ANNOTATION_TYPES = new HashSet<>();
+    /**
+     * SQL 操作注解集合
+     */
+    private static final Set<Class<? extends Annotation>> SQL_ANNOTATION_TYPES = new HashSet<>();
 
-  private final Configuration configuration;
-  private final MapperBuilderAssistant assistant;
-  private final Class<?> type;
+    /**
+     * SQL 操作提供者注解集合
+     */
+    private static final Set<Class<? extends Annotation>> SQL_PROVIDER_ANNOTATION_TYPES = new HashSet<>();
 
-  static {
-    SQL_ANNOTATION_TYPES.add(Select.class);
-    SQL_ANNOTATION_TYPES.add(Insert.class);
-    SQL_ANNOTATION_TYPES.add(Update.class);
-    SQL_ANNOTATION_TYPES.add(Delete.class);
+    private final Configuration configuration;
+    private final MapperBuilderAssistant assistant;
 
-    SQL_PROVIDER_ANNOTATION_TYPES.add(SelectProvider.class);
-    SQL_PROVIDER_ANNOTATION_TYPES.add(InsertProvider.class);
-    SQL_PROVIDER_ANNOTATION_TYPES.add(UpdateProvider.class);
-    SQL_PROVIDER_ANNOTATION_TYPES.add(DeleteProvider.class);
-  }
+    /**
+     * Mapper 接口类
+     */
+    private final Class<?> type;
 
-  public MapperAnnotationBuilder(Configuration configuration, Class<?> type) {
-    String resource = type.getName().replace('.', '/') + ".java (best guess)";
-    this.assistant = new MapperBuilderAssistant(configuration, resource);
-    this.configuration = configuration;
-    this.type = type;
-  }
+    // 类初始化的，提前加入@select、@SelectProvider 等
+    static {
+        SQL_ANNOTATION_TYPES.add(Select.class);
+        SQL_ANNOTATION_TYPES.add(Insert.class);
+        SQL_ANNOTATION_TYPES.add(Update.class);
+        SQL_ANNOTATION_TYPES.add(Delete.class);
 
-  public void parse() {
-    String resource = type.toString();
-    if (!configuration.isResourceLoaded(resource)) {
-      loadXmlResource();
-      configuration.addLoadedResource(resource);
-      assistant.setCurrentNamespace(type.getName());
-      parseCache();
-      parseCacheRef();
-      Method[] methods = type.getMethods();
-      for (Method method : methods) {
-        try {
-          // issue #237
-          if (!method.isBridge()) {
-            parseStatement(method);
-          }
-        } catch (IncompleteElementException e) {
-          configuration.addIncompleteMethod(new MethodResolver(this, method));
-        }
-      }
+        SQL_PROVIDER_ANNOTATION_TYPES.add(SelectProvider.class);
+        SQL_PROVIDER_ANNOTATION_TYPES.add(InsertProvider.class);
+        SQL_PROVIDER_ANNOTATION_TYPES.add(UpdateProvider.class);
+        SQL_PROVIDER_ANNOTATION_TYPES.add(DeleteProvider.class);
     }
-    parsePendingMethods();
-  }
 
-  private void parsePendingMethods() {
-    Collection<MethodResolver> incompleteMethods = configuration.getIncompleteMethods();
-    synchronized (incompleteMethods) {
-      Iterator<MethodResolver> iter = incompleteMethods.iterator();
-      while (iter.hasNext()) {
-        try {
-          iter.next().resolve();
-          iter.remove();
-        } catch (IncompleteElementException e) {
-          // This method is still missing a resource
-        }
-      }
+    public MapperAnnotationBuilder(Configuration configuration, Class<?> type) {
+        // cn/dqb/mybatisstudy/mapper/BlogMapper.java (best guess)
+        String resource = type.getName().replace('.', '/') + ".java (best guess)";
+        // 默认使用 MapperBuilderAssistant 辅助解析
+        this.assistant = new MapperBuilderAssistant(configuration, resource);
+        this.configuration = configuration;
+        this.type = type;
     }
-  }
 
-  private void loadXmlResource() {
-    // Spring may not know the real resource name so we check a flag
-    // to prevent loading again a resource twice
-    // this flag is set at XMLMapperBuilder#bindMapperForNamespace
-    if (!configuration.isResourceLoaded("namespace:" + type.getName())) {
-      String xmlResource = type.getName().replace('.', '/') + ".xml";
-      // #1347
-      InputStream inputStream = type.getResourceAsStream("/" + xmlResource);
-      if (inputStream == null) {
-        // Search XML mapper that is not in the module but in the classpath. 
-        try {
-          inputStream = Resources.getResourceAsStream(type.getClassLoader(), xmlResource);
-        } catch (IOException e2) {
-          // ignore, resource is not required
-        }
-      }
-      if (inputStream != null) {
-        XMLMapperBuilder xmlParser = new XMLMapperBuilder(inputStream, assistant.getConfiguration(), xmlResource, configuration.getSqlFragments(), type.getName());
-        xmlParser.parse();
-      }
-    }
-  }
+    public void parse() {
+        // <1> 判断当前 Mapper 接口是否应加载过。
+        String resource = type.toString();
+        if (!configuration.isResourceLoaded(resource)) { // 未加载过
+            // <2> 加载对应的 XML Mapper，允许找不到
+            loadXmlResource();
 
-  private void parseCache() {
-    CacheNamespace cacheDomain = type.getAnnotation(CacheNamespace.class);
-    if (cacheDomain != null) {
-      Integer size = cacheDomain.size() == 0 ? null : cacheDomain.size();
-      Long flushInterval = cacheDomain.flushInterval() == 0 ? null : cacheDomain.flushInterval();
-      Properties props = convertToProperties(cacheDomain.properties());
-      assistant.useNewCache(cacheDomain.implementation(), cacheDomain.eviction(), flushInterval, size, cacheDomain.readWrite(), cacheDomain.blocking(), props);
-    }
-  }
+            // <3> 标记该 Mapper 接口已经加载过
+            configuration.addLoadedResource(resource);
 
-  private Properties convertToProperties(Property[] properties) {
-    if (properties.length == 0) {
-      return null;
-    }
-    Properties props = new Properties();
-    for (Property property : properties) {
-      props.setProperty(property.name(),
-          PropertyParser.parse(property.value(), configuration.getVariables()));
-    }
-    return props;
-  }
+            // <4> 设置 namespace 属性
+            assistant.setCurrentNamespace(type.getName());
 
-  private void parseCacheRef() {
-    CacheNamespaceRef cacheDomainRef = type.getAnnotation(CacheNamespaceRef.class);
-    if (cacheDomainRef != null) {
-      Class<?> refType = cacheDomainRef.value();
-      String refName = cacheDomainRef.name();
-      if (refType == void.class && refName.isEmpty()) {
-        throw new BuilderException("Should be specified either value() or name() attribute in the @CacheNamespaceRef");
-      }
-      if (refType != void.class && !refName.isEmpty()) {
-        throw new BuilderException("Cannot use both value() and name() attribute in the @CacheNamespaceRef");
-      }
-      String namespace = (refType != void.class) ? refType.getName() : refName;
-      try {
-        assistant.useCacheRef(namespace);
-      } catch (IncompleteElementException e) {
-        configuration.addIncompleteCacheRef(new CacheRefResolver(assistant, namespace));
-      }
-    }
-  }
+            // <5> 解析 @CacheNamespace 注解
+            parseCache();
 
-  private String parseResultMap(Method method) {
-    Class<?> returnType = getReturnType(method);
-    ConstructorArgs args = method.getAnnotation(ConstructorArgs.class);
-    Results results = method.getAnnotation(Results.class);
-    TypeDiscriminator typeDiscriminator = method.getAnnotation(TypeDiscriminator.class);
-    String resultMapId = generateResultMapName(method);
-    applyResultMap(resultMapId, returnType, argsIf(args), resultsIf(results), typeDiscriminator);
-    return resultMapId;
-  }
+            // <6> 解析 @CacheNamespaceRef 注解
+            parseCacheRef();
 
-  private String generateResultMapName(Method method) {
-    Results results = method.getAnnotation(Results.class);
-    if (results != null && !results.id().isEmpty()) {
-      return type.getName() + "." + results.id();
-    }
-    StringBuilder suffix = new StringBuilder();
-    for (Class<?> c : method.getParameterTypes()) {
-      suffix.append("-");
-      suffix.append(c.getSimpleName());
-    }
-    if (suffix.length() < 1) {
-      suffix.append("-void");
-    }
-    return type.getName() + "." + method.getName() + suffix;
-  }
-
-  private void applyResultMap(String resultMapId, Class<?> returnType, Arg[] args, Result[] results, TypeDiscriminator discriminator) {
-    List<ResultMapping> resultMappings = new ArrayList<>();
-    applyConstructorArgs(args, returnType, resultMappings);
-    applyResults(results, returnType, resultMappings);
-    Discriminator disc = applyDiscriminator(resultMapId, returnType, discriminator);
-    // TODO add AutoMappingBehaviour
-    assistant.addResultMap(resultMapId, returnType, null, disc, resultMappings, null);
-    createDiscriminatorResultMaps(resultMapId, returnType, discriminator);
-  }
-
-  private void createDiscriminatorResultMaps(String resultMapId, Class<?> resultType, TypeDiscriminator discriminator) {
-    if (discriminator != null) {
-      for (Case c : discriminator.cases()) {
-        String caseResultMapId = resultMapId + "-" + c.value();
-        List<ResultMapping> resultMappings = new ArrayList<>();
-        // issue #136
-        applyConstructorArgs(c.constructArgs(), resultType, resultMappings);
-        applyResults(c.results(), resultType, resultMappings);
-        // TODO add AutoMappingBehaviour
-        assistant.addResultMap(caseResultMapId, c.type(), resultMapId, null, resultMappings, null);
-      }
-    }
-  }
-
-  private Discriminator applyDiscriminator(String resultMapId, Class<?> resultType, TypeDiscriminator discriminator) {
-    if (discriminator != null) {
-      String column = discriminator.column();
-      Class<?> javaType = discriminator.javaType() == void.class ? String.class : discriminator.javaType();
-      JdbcType jdbcType = discriminator.jdbcType() == JdbcType.UNDEFINED ? null : discriminator.jdbcType();
-      @SuppressWarnings("unchecked")
-      Class<? extends TypeHandler<?>> typeHandler = (Class<? extends TypeHandler<?>>)
-              (discriminator.typeHandler() == UnknownTypeHandler.class ? null : discriminator.typeHandler());
-      Case[] cases = discriminator.cases();
-      Map<String, String> discriminatorMap = new HashMap<>();
-      for (Case c : cases) {
-        String value = c.value();
-        String caseResultMapId = resultMapId + "-" + value;
-        discriminatorMap.put(value, caseResultMapId);
-      }
-      return assistant.buildDiscriminator(resultType, column, javaType, jdbcType, typeHandler, discriminatorMap);
-    }
-    return null;
-  }
-
-  void parseStatement(Method method) {
-    Class<?> parameterTypeClass = getParameterType(method);
-    LanguageDriver languageDriver = getLanguageDriver(method);
-    SqlSource sqlSource = getSqlSourceFromAnnotations(method, parameterTypeClass, languageDriver);
-    if (sqlSource != null) {
-      Options options = method.getAnnotation(Options.class);
-      final String mappedStatementId = type.getName() + "." + method.getName();
-      Integer fetchSize = null;
-      Integer timeout = null;
-      StatementType statementType = StatementType.PREPARED;
-      ResultSetType resultSetType = null;
-      SqlCommandType sqlCommandType = getSqlCommandType(method);
-      boolean isSelect = sqlCommandType == SqlCommandType.SELECT;
-      boolean flushCache = !isSelect;
-      boolean useCache = isSelect;
-
-      KeyGenerator keyGenerator;
-      String keyProperty = null;
-      String keyColumn = null;
-      if (SqlCommandType.INSERT.equals(sqlCommandType) || SqlCommandType.UPDATE.equals(sqlCommandType)) {
-        // first check for SelectKey annotation - that overrides everything else
-        SelectKey selectKey = method.getAnnotation(SelectKey.class);
-        if (selectKey != null) {
-          keyGenerator = handleSelectKeyAnnotation(selectKey, mappedStatementId, getParameterType(method), languageDriver);
-          keyProperty = selectKey.keyProperty();
-        } else if (options == null) {
-          keyGenerator = configuration.isUseGeneratedKeys() ? Jdbc3KeyGenerator.INSTANCE : NoKeyGenerator.INSTANCE;
-        } else {
-          keyGenerator = options.useGeneratedKeys() ? Jdbc3KeyGenerator.INSTANCE : NoKeyGenerator.INSTANCE;
-          keyProperty = options.keyProperty();
-          keyColumn = options.keyColumn();
-        }
-      } else {
-        keyGenerator = NoKeyGenerator.INSTANCE;
-      }
-
-      if (options != null) {
-        if (FlushCachePolicy.TRUE.equals(options.flushCache())) {
-          flushCache = true;
-        } else if (FlushCachePolicy.FALSE.equals(options.flushCache())) {
-          flushCache = false;
-        }
-        useCache = options.useCache();
-        fetchSize = options.fetchSize() > -1 || options.fetchSize() == Integer.MIN_VALUE ? options.fetchSize() : null; //issue #348
-        timeout = options.timeout() > -1 ? options.timeout() : null;
-        statementType = options.statementType();
-        resultSetType = options.resultSetType();
-      }
-
-      String resultMapId = null;
-      ResultMap resultMapAnnotation = method.getAnnotation(ResultMap.class);
-      if (resultMapAnnotation != null) {
-        String[] resultMaps = resultMapAnnotation.value();
-        StringBuilder sb = new StringBuilder();
-        for (String resultMap : resultMaps) {
-          if (sb.length() > 0) {
-            sb.append(",");
-          }
-          sb.append(resultMap);
-        }
-        resultMapId = sb.toString();
-      } else if (isSelect) {
-        resultMapId = parseResultMap(method);
-      }
-
-      assistant.addMappedStatement(
-          mappedStatementId,
-          sqlSource,
-          statementType,
-          sqlCommandType,
-          fetchSize,
-          timeout,
-          // ParameterMapID
-          null,
-          parameterTypeClass,
-          resultMapId,
-          getReturnType(method),
-          resultSetType,
-          flushCache,
-          useCache,
-          // TODO gcode issue #577
-          false,
-          keyGenerator,
-          keyProperty,
-          keyColumn,
-          // DatabaseID
-          null,
-          languageDriver,
-          // ResultSets
-          options != null ? nullOrEmpty(options.resultSets()) : null);
-    }
-  }
-  
-  private LanguageDriver getLanguageDriver(Method method) {
-    Lang lang = method.getAnnotation(Lang.class);
-    Class<? extends LanguageDriver> langClass = null;
-    if (lang != null) {
-      langClass = lang.value();
-    }
-    return assistant.getLanguageDriver(langClass);
-  }
-
-  private Class<?> getParameterType(Method method) {
-    Class<?> parameterType = null;
-    Class<?>[] parameterTypes = method.getParameterTypes();
-    for (Class<?> currentParameterType : parameterTypes) {
-      if (!RowBounds.class.isAssignableFrom(currentParameterType) && !ResultHandler.class.isAssignableFrom(currentParameterType)) {
-        if (parameterType == null) {
-          parameterType = currentParameterType;
-        } else {
-          // issue #135
-          parameterType = ParamMap.class;
-        }
-      }
-    }
-    return parameterType;
-  }
-
-  private Class<?> getReturnType(Method method) {
-    Class<?> returnType = method.getReturnType();
-    Type resolvedReturnType = TypeParameterResolver.resolveReturnType(method, type);
-    if (resolvedReturnType instanceof Class) {
-      returnType = (Class<?>) resolvedReturnType;
-      if (returnType.isArray()) {
-        returnType = returnType.getComponentType();
-      }
-      // gcode issue #508
-      if (void.class.equals(returnType)) {
-        ResultType rt = method.getAnnotation(ResultType.class);
-        if (rt != null) {
-          returnType = rt.value();
-        }
-      }
-    } else if (resolvedReturnType instanceof ParameterizedType) {
-      ParameterizedType parameterizedType = (ParameterizedType) resolvedReturnType;
-      Class<?> rawType = (Class<?>) parameterizedType.getRawType();
-      if (Collection.class.isAssignableFrom(rawType) || Cursor.class.isAssignableFrom(rawType)) {
-        Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
-        if (actualTypeArguments != null && actualTypeArguments.length == 1) {
-          Type returnTypeParameter = actualTypeArguments[0];
-          if (returnTypeParameter instanceof Class<?>) {
-            returnType = (Class<?>) returnTypeParameter;
-          } else if (returnTypeParameter instanceof ParameterizedType) {
-            // (gcode issue #443) actual type can be a also a parameterized type
-            returnType = (Class<?>) ((ParameterizedType) returnTypeParameter).getRawType();
-          } else if (returnTypeParameter instanceof GenericArrayType) {
-            Class<?> componentType = (Class<?>) ((GenericArrayType) returnTypeParameter).getGenericComponentType();
-            // (gcode issue #525) support List<byte[]>
-            returnType = Array.newInstance(componentType, 0).getClass();
-          }
-        }
-      } else if (method.isAnnotationPresent(MapKey.class) && Map.class.isAssignableFrom(rawType)) {
-        // (gcode issue 504) Do not look into Maps if there is not MapKey annotation
-        Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
-          if (actualTypeArguments != null && actualTypeArguments.length == 2) {
-            Type returnTypeParameter = actualTypeArguments[1];
-            if (returnTypeParameter instanceof Class<?>) {
-              returnType = (Class<?>) returnTypeParameter;
-            } else if (returnTypeParameter instanceof ParameterizedType) {
-              // (gcode issue 443) actual type can be a also a parameterized type
-              returnType = (Class<?>) ((ParameterizedType) returnTypeParameter).getRawType();
+            // <7> 遍历每个方法，解析其上的注解
+            Method[] methods = type.getMethods();
+            for (Method method : methods) {
+                try {
+                    // issue #237
+                    if (!method.isBridge()) {
+                        // <7.1> 执行解析
+                        parseStatement(method);
+                    }
+                } catch (IncompleteElementException e) {
+                    // <7.2> 解析失败，添加到 configuration 中
+                    configuration.addIncompleteMethod(new MethodResolver(this, method));
+                }
             }
-          }
-      } else if (Optional.class.equals(rawType)) {
-        Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
-        Type returnTypeParameter = actualTypeArguments[0];
-        if (returnTypeParameter instanceof Class<?>) {
-          returnType = (Class<?>) returnTypeParameter;
         }
-      }
+
+        // <8> 解析待定的方法
+        parsePendingMethods();
     }
 
-    return returnType;
-  }
+    private void parsePendingMethods() {
+        // 获得 MethodResolver 集合，并遍历进行处理
+        Collection<MethodResolver> incompleteMethods = configuration.getIncompleteMethods();
+        synchronized (incompleteMethods) {
+            Iterator<MethodResolver> iter = incompleteMethods.iterator();
+            while (iter.hasNext()) {
+                try {
+                    // 执行解析
+                    iter.next().resolve();
 
-  private SqlSource getSqlSourceFromAnnotations(Method method, Class<?> parameterType, LanguageDriver languageDriver) {
-    try {
-      Class<? extends Annotation> sqlAnnotationType = getSqlAnnotationType(method);
-      Class<? extends Annotation> sqlProviderAnnotationType = getSqlProviderAnnotationType(method);
-      if (sqlAnnotationType != null) {
-        if (sqlProviderAnnotationType != null) {
-          throw new BindingException("You cannot supply both a static SQL and SqlProvider to method named " + method.getName());
+                    // 成功移除，失败继续保留在集合中，等待后续的解析来激活
+                    iter.remove();
+                } catch (IncompleteElementException e) {
+                    // This method is still missing a resource
+                }
+            }
         }
-        Annotation sqlAnnotation = method.getAnnotation(sqlAnnotationType);
-        final String[] strings = (String[]) sqlAnnotation.getClass().getMethod("value").invoke(sqlAnnotation);
-        return buildSqlSourceFromStrings(strings, parameterType, languageDriver);
-      } else if (sqlProviderAnnotationType != null) {
-        Annotation sqlProviderAnnotation = method.getAnnotation(sqlProviderAnnotationType);
-        return new ProviderSqlSource(assistant.getConfiguration(), sqlProviderAnnotation, type, method);
-      }
-      return null;
-    } catch (Exception e) {
-      throw new BuilderException("Could not find value method on SQL annotation.  Cause: " + e, e);
-    }
-  }
-
-  private SqlSource buildSqlSourceFromStrings(String[] strings, Class<?> parameterTypeClass, LanguageDriver languageDriver) {
-    final StringBuilder sql = new StringBuilder();
-    for (String fragment : strings) {
-      sql.append(fragment);
-      sql.append(" ");
-    }
-    return languageDriver.createSqlSource(configuration, sql.toString().trim(), parameterTypeClass);
-  }
-
-  private SqlCommandType getSqlCommandType(Method method) {
-    Class<? extends Annotation> type = getSqlAnnotationType(method);
-
-    if (type == null) {
-      type = getSqlProviderAnnotationType(method);
-
-      if (type == null) {
-        return SqlCommandType.UNKNOWN;
-      }
-
-      if (type == SelectProvider.class) {
-        type = Select.class;
-      } else if (type == InsertProvider.class) {
-        type = Insert.class;
-      } else if (type == UpdateProvider.class) {
-        type = Update.class;
-      } else if (type == DeleteProvider.class) {
-        type = Delete.class;
-      }
     }
 
-    return SqlCommandType.valueOf(type.getSimpleName().toUpperCase(Locale.ENGLISH));
-  }
+    private void loadXmlResource() {
+        // Spring may not know the real resource name so we check a flag
+        // to prevent loading again a resource twice
+        // this flag is set at XMLMapperBuilder#bindMapperForNamespace
 
-  private Class<? extends Annotation> getSqlAnnotationType(Method method) {
-    return chooseAnnotationType(method, SQL_ANNOTATION_TYPES);
-  }
+        // <1> 判断 Mapper XML 是否已经加载过，如果加载过，就不加载了。
+        // 此处，是为了避免和 XMLMapperBuilder#parse() 方法冲突，重复解析
+        if (!configuration.isResourceLoaded("namespace:" + type.getName())) {
 
-  private Class<? extends Annotation> getSqlProviderAnnotationType(Method method) {
-    return chooseAnnotationType(method, SQL_PROVIDER_ANNOTATION_TYPES);
-  }
+            // 默认的mapper路径为：类名 + .xml，如 cn/dqb/mybatisstudy/mapper/BlogMapper.xml
+            String xmlResource = type.getName().replace('.', '/') + ".xml";
+            // #1347
 
-  private Class<? extends Annotation> chooseAnnotationType(Method method, Set<Class<? extends Annotation>> types) {
-    for (Class<? extends Annotation> type : types) {
-      Annotation annotation = method.getAnnotation(type);
-      if (annotation != null) {
-        return type;
-      }
+            // 从当前路径下加载 mapper 文件，如 /cn/dqb/mybatisstudy/mapper/BlogMapper.xml
+            // 说明在为指定 mapper.xml 具体路径时，默认需要把 mapper.xml 放到 resources 下的 /cn/dqb/mybatisstudy/mapper/BlogMapper.xml 下
+            // 否则找不到
+            InputStream inputStream = type.getResourceAsStream("/" + xmlResource);
+            if (inputStream == null) {
+                // Search XML mapper that is not in the module but in the classpath.
+                try {
+                    // 从类路径加载
+                    inputStream = Resources.getResourceAsStream(type.getClassLoader(), xmlResource);
+                } catch (IOException e2) {
+                    // ignore, resource is not required
+                }
+            }
+            if (inputStream != null) {
+                // 找到文件，则新建一个 XMLMapperBuilder 解析 xml 文件
+                XMLMapperBuilder xmlParser = new XMLMapperBuilder(inputStream, assistant.getConfiguration(),
+                        xmlResource, configuration.getSqlFragments(), type.getName());
+                xmlParser.parse();
+            }
+        }
     }
-    return null;
-  }
 
-  private void applyResults(Result[] results, Class<?> resultType, List<ResultMapping> resultMappings) {
-    for (Result result : results) {
-      List<ResultFlag> flags = new ArrayList<>();
-      if (result.id()) {
-        flags.add(ResultFlag.ID);
-      }
-      @SuppressWarnings("unchecked")
-      Class<? extends TypeHandler<?>> typeHandler = (Class<? extends TypeHandler<?>>)
-              ((result.typeHandler() == UnknownTypeHandler.class) ? null : result.typeHandler());
-      ResultMapping resultMapping = assistant.buildResultMapping(
-          resultType,
-          nullOrEmpty(result.property()),
-          nullOrEmpty(result.column()),
-          result.javaType() == void.class ? null : result.javaType(),
-          result.jdbcType() == JdbcType.UNDEFINED ? null : result.jdbcType(),
-          hasNestedSelect(result) ? nestedSelectId(result) : null,
-          null,
-          null,
-          null,
-          typeHandler,
-          flags,
-          null,
-          null,
-          isLazy(result));
-      resultMappings.add(resultMapping);
+    /**
+     * 解析类上的 @CacheNamespace 注解
+     * <pre>{@code
+     * @CacheNamespace
+     * public interface BlogMapper {
+     *
+     * }}</pre>
+     */
+    private void parseCache() {
+        // <1> 获得类上的 @CacheNamespace 注解
+        CacheNamespace cacheDomain = type.getAnnotation(CacheNamespace.class);
+        if (cacheDomain != null) {
+            // <2> 获得各种属性
+            Integer size = cacheDomain.size() == 0 ? null : cacheDomain.size();
+            Long flushInterval = cacheDomain.flushInterval() == 0 ? null : cacheDomain.flushInterval();
+
+            // <3> 获得 Properties 属性
+            Properties props = convertToProperties(cacheDomain.properties());
+
+            // <4> 创建 Cache 对象
+            assistant.useNewCache(cacheDomain.implementation(), cacheDomain.eviction(), flushInterval, size,
+                    cacheDomain.readWrite(), cacheDomain.blocking(), props);
+        }
     }
-  }
-  
-  private String nestedSelectId(Result result) {
-    String nestedSelect = result.one().select();
-    if (nestedSelect.length() < 1) {
-      nestedSelect = result.many().select();
+
+    private Properties convertToProperties(Property[] properties) {
+        if (properties.length == 0) {
+            return null;
+        }
+        Properties props = new Properties();
+        for (Property property : properties) {
+            // 占位符替换
+            props.setProperty(property.name(),
+                    PropertyParser.parse(property.value(), configuration.getVariables()));
+        }
+        return props;
     }
-    if (!nestedSelect.contains(".")) {
-      nestedSelect = type.getName() + "." + nestedSelect;
+
+    /**
+     * 解析类上的 @CacheNamespaceRef 注解
+     * <pre>{@code
+     * @CacheNamespaceRef
+     * public interface BlogMapper {
+     *
+     * }}</pre>
+     */
+    private void parseCacheRef() {
+        // 获得类上的 @CacheNamespaceRef 注解
+        CacheNamespaceRef cacheDomainRef = type.getAnnotation(CacheNamespaceRef.class);
+        if (cacheDomainRef != null) {
+            // <2> 获得各种属性
+            Class<?> refType = cacheDomainRef.value();
+            String refName = cacheDomainRef.name();
+
+            // <2> 校验，如果 refType 和 refName 都为空，则抛出 BuilderException 异常
+            if (refType == void.class && refName.isEmpty()) {
+                throw new BuilderException("Should be specified either value() or name() attribute in the " +
+                        "@CacheNamespaceRef");
+            }
+
+            // <2> 校验，如果 refType 和 refName 都不为空，则抛出 BuilderException 异常
+            if (refType != void.class && !refName.isEmpty()) {
+                throw new BuilderException("Cannot use both value() and name() attribute in the @CacheNamespaceRef");
+            }
+
+            // <2> 获得最终的 namespace 属性
+            String namespace = (refType != void.class) ? refType.getName() : refName;
+            try {
+                // <3> 获得指向的 Cache 对象
+                assistant.useCacheRef(namespace);
+            } catch (IncompleteElementException e) {
+
+                // 这里抛出异常，有可能是先后顺序问题，所以在这里先记录，后续去处理
+                configuration.addIncompleteCacheRef(new CacheRefResolver(assistant, namespace));
+            }
+        }
     }
-    return nestedSelect;
-  }
 
-  private boolean isLazy(Result result) {
-    boolean isLazy = configuration.isLazyLoadingEnabled();
-    if (result.one().select().length() > 0 && FetchType.DEFAULT != result.one().fetchType()) {
-      isLazy = result.one().fetchType() == FetchType.LAZY;
-    } else if (result.many().select().length() > 0 && FetchType.DEFAULT != result.many().fetchType()) {
-      isLazy = result.many().fetchType() == FetchType.LAZY;
+    private String parseResultMap(Method method) {
+        // <1> 获得返回类型
+        Class<?> returnType = getReturnType(method);
+
+        // <2> 获得 @ConstructorArgs、@Results、@TypeDiscriminator 注解
+        ConstructorArgs args = method.getAnnotation(ConstructorArgs.class);
+        Results results = method.getAnnotation(Results.class);
+        TypeDiscriminator typeDiscriminator = method.getAnnotation(TypeDiscriminator.class);
+
+        // <3> 生成 resultMapId
+        String resultMapId = generateResultMapName(method);
+
+        // <4> 生成 ResultMap 对象
+        applyResultMap(resultMapId, returnType, argsIf(args), resultsIf(results), typeDiscriminator);
+        return resultMapId;
     }
-    return isLazy;
-  }
-  
-  private boolean hasNestedSelect(Result result) {
-    if (result.one().select().length() > 0 && result.many().select().length() > 0) {
-      throw new BuilderException("Cannot use both @One and @Many annotations in the same @Result");
+
+    private String generateResultMapName(Method method) {
+        // 第一种情况，已经声明
+        // 如果有 @Results 注解，并且有设置 id 属性，则直接返回。格式为：`${type.name}.${Results.id}` 。
+        Results results = method.getAnnotation(Results.class);
+        if (results != null && !results.id().isEmpty()) {
+            return type.getName() + "." + results.id();
+        }
+
+        // 第二种情况，自动生成
+        // 获得 suffix 前缀，相当于方法参数构成的签名
+        StringBuilder suffix = new StringBuilder();
+        for (Class<?> c : method.getParameterTypes()) {
+            suffix.append("-");
+            suffix.append(c.getSimpleName());
+        }
+        if (suffix.length() < 1) {
+            suffix.append("-void");
+        }
+
+        // 拼接返回。格式为 `${type.name}.${method.name}${suffix}` 。
+        return type.getName() + "." + method.getName() + suffix;
     }
-    return result.one().select().length() > 0 || result.many().select().length() > 0;  
-  }
 
-  private void applyConstructorArgs(Arg[] args, Class<?> resultType, List<ResultMapping> resultMappings) {
-    for (Arg arg : args) {
-      List<ResultFlag> flags = new ArrayList<>();
-      flags.add(ResultFlag.CONSTRUCTOR);
-      if (arg.id()) {
-        flags.add(ResultFlag.ID);
-      }
-      @SuppressWarnings("unchecked")
-      Class<? extends TypeHandler<?>> typeHandler = (Class<? extends TypeHandler<?>>)
-              (arg.typeHandler() == UnknownTypeHandler.class ? null : arg.typeHandler());
-      ResultMapping resultMapping = assistant.buildResultMapping(
-          resultType,
-          nullOrEmpty(arg.name()),
-          nullOrEmpty(arg.column()),
-          arg.javaType() == void.class ? null : arg.javaType(),
-          arg.jdbcType() == JdbcType.UNDEFINED ? null : arg.jdbcType(),
-          nullOrEmpty(arg.select()),
-          nullOrEmpty(arg.resultMap()),
-          null,
-          nullOrEmpty(arg.columnPrefix()),
-          typeHandler,
-          flags,
-          null,
-          null,
-          false);
-      resultMappings.add(resultMapping);
+    private void applyResultMap(String resultMapId, Class<?> returnType, Arg[] args, Result[] results,
+                                TypeDiscriminator discriminator) {
+        // <1> 创建 ResultMapping 数组
+        List<ResultMapping> resultMappings = new ArrayList<>();
+
+        // <2> 将 @Arg[] 注解数组，解析成对应的 ResultMapping 对象们，并添加到 resultMappings 中。
+        applyConstructorArgs(args, returnType, resultMappings);
+
+        // <3> 将 @Result[] 注解数组，解析成对应的 ResultMapping 对象们，并添加到 resultMappings 中。
+        applyResults(results, returnType, resultMappings);
+
+        // <4> 创建 Discriminator 对象
+        Discriminator disc = applyDiscriminator(resultMapId, returnType, discriminator);
+
+        // <5> ResultMap 对象
+        // TODO add AutoMappingBehaviour
+        assistant.addResultMap(resultMapId, returnType, null, disc, resultMappings, null);
+
+        // <6> 创建 Discriminator 的 ResultMap 对象们
+        createDiscriminatorResultMaps(resultMapId, returnType, discriminator);
     }
-  }
 
-  private String nullOrEmpty(String value) {
-    return value == null || value.trim().length() == 0 ? null : value;
-  }
+    private void createDiscriminatorResultMaps(String resultMapId, Class<?> resultType,
+                                               TypeDiscriminator discriminator) {
+        if (discriminator != null) {
+            // 遍历 @Case 注解
+            for (Case c : discriminator.cases()) {
+                // 创建 @Case 注解的 ResultMap 的编号
+                String caseResultMapId = resultMapId + "-" + c.value();
 
-  private Result[] resultsIf(Results results) {
-    return results == null ? new Result[0] : results.value();
-  }
+                // 创建 ResultMapping 数组
+                List<ResultMapping> resultMappings = new ArrayList<>();
+                // issue #136
+                // 将 @Arg[] 注解数组，解析成对应的 ResultMapping 对象们，并添加到 resultMappings 中。
+                applyConstructorArgs(c.constructArgs(), resultType, resultMappings);
 
-  private Arg[] argsIf(ConstructorArgs args) {
-    return args == null ? new Arg[0] : args.value();
-  }
+                // 将 @Result[] 注解数组，解析成对应的 ResultMapping 对象们，并添加到 resultMappings 中。
+                applyResults(c.results(), resultType, resultMappings);
 
-  private KeyGenerator handleSelectKeyAnnotation(SelectKey selectKeyAnnotation, String baseStatementId, Class<?> parameterTypeClass, LanguageDriver languageDriver) {
-    String id = baseStatementId + SelectKeyGenerator.SELECT_KEY_SUFFIX;
-    Class<?> resultTypeClass = selectKeyAnnotation.resultType();
-    StatementType statementType = selectKeyAnnotation.statementType();
-    String keyProperty = selectKeyAnnotation.keyProperty();
-    String keyColumn = selectKeyAnnotation.keyColumn();
-    boolean executeBefore = selectKeyAnnotation.before();
+                // TODO add AutoMappingBehaviour
+                // 创建 ResultMap 对象
+                assistant.addResultMap(caseResultMapId, c.type(), resultMapId, null, resultMappings, null);
+            }
+        }
+    }
 
-    // defaults
-    boolean useCache = false;
-    KeyGenerator keyGenerator = NoKeyGenerator.INSTANCE;
-    Integer fetchSize = null;
-    Integer timeout = null;
-    boolean flushCache = false;
-    String parameterMap = null;
-    String resultMap = null;
-    ResultSetType resultSetTypeEnum = null;
+    private Discriminator applyDiscriminator(String resultMapId, Class<?> resultType, TypeDiscriminator discriminator) {
+        if (discriminator != null) {
+            // 解析各种属性
+            String column = discriminator.column();
+            Class<?> javaType = discriminator.javaType() == void.class ? String.class : discriminator.javaType();
+            JdbcType jdbcType = discriminator.jdbcType() == JdbcType.UNDEFINED ? null : discriminator.jdbcType();
+            // 获得 TypeHandler 类
+            @SuppressWarnings("unchecked")
+            Class<? extends TypeHandler<?>> typeHandler = (Class<? extends TypeHandler<?>>)
+                    (discriminator.typeHandler() == UnknownTypeHandler.class ? null : discriminator.typeHandler());
+            Case[] cases = discriminator.cases();
 
-    SqlSource sqlSource = buildSqlSourceFromStrings(selectKeyAnnotation.statement(), parameterTypeClass, languageDriver);
-    SqlCommandType sqlCommandType = SqlCommandType.SELECT;
+            // 遍历 @Case[] 注解数组，解析成 discriminatorMap 集合
+            Map<String, String> discriminatorMap = new HashMap<>();
+            for (Case c : cases) {
+                String value = c.value();
+                String caseResultMapId = resultMapId + "-" + value;
+                discriminatorMap.put(value, caseResultMapId);
+            }
+            // 创建 Discriminator 对象
+            return assistant.buildDiscriminator(resultType, column, javaType, jdbcType, typeHandler, discriminatorMap);
+        }
+        return null;
+    }
 
-    assistant.addMappedStatement(id, sqlSource, statementType, sqlCommandType, fetchSize, timeout, parameterMap, parameterTypeClass, resultMap, resultTypeClass, resultSetTypeEnum,
-        flushCache, useCache, false,
-        keyGenerator, keyProperty, keyColumn, null, languageDriver, null);
+    /**
+     * 解析 @Select 等注解
+     */
+    void parseStatement(Method method) {
+        // <1> 获得参数的类型
+        Class<?> parameterTypeClass = getParameterType(method);
 
-    id = assistant.applyCurrentNamespace(id, false);
+        // <2> 获得 LanguageDriver 对象
+        LanguageDriver languageDriver = getLanguageDriver(method);
 
-    MappedStatement keyStatement = configuration.getMappedStatement(id, false);
-    SelectKeyGenerator answer = new SelectKeyGenerator(keyStatement, executeBefore);
-    configuration.addKeyGenerator(id, answer);
-    return answer;
-  }
+        // <3> 获得 SqlSource 对象
+        SqlSource sqlSource = getSqlSourceFromAnnotations(method, parameterTypeClass, languageDriver);
+        if (sqlSource != null) {
+            // <4> 获得各种属性
+            Options options = method.getAnnotation(Options.class);
+            final String mappedStatementId = type.getName() + "." + method.getName();
+            Integer fetchSize = null;
+            Integer timeout = null;
+            StatementType statementType = StatementType.PREPARED;
+            ResultSetType resultSetType = null;
+
+            // 方法上注解类型
+            SqlCommandType sqlCommandType = getSqlCommandType(method);
+
+            // 是否是 select 语句
+            boolean isSelect = sqlCommandType == SqlCommandType.SELECT;
+
+            // 不是 select 语句，则不清空缓存
+            boolean flushCache = !isSelect;
+
+            // 是 select 语句，则使用缓存
+            boolean useCache = isSelect;
+
+            // <5> 获得 KeyGenerator 对象
+            KeyGenerator keyGenerator;
+            String keyProperty = null;
+            String keyColumn = null;
+
+            // 如果是 insert 或者 update 语句
+            if (SqlCommandType.INSERT.equals(sqlCommandType) || SqlCommandType.UPDATE.equals(sqlCommandType)) {
+                // first check for SelectKey annotation - that overrides everything else
+                // <5.1> 如果有 @SelectKey 注解，则进行处理
+                SelectKey selectKey = method.getAnnotation(SelectKey.class);
+                if (selectKey != null) {
+                    keyGenerator = handleSelectKeyAnnotation(selectKey, mappedStatementId, getParameterType(method),
+                            languageDriver);
+                    keyProperty = selectKey.keyProperty();
+                } else if (options == null) { // <5.2> 如果无 @Options 注解，则根据全局配置处理
+                    keyGenerator = configuration.isUseGeneratedKeys() ? Jdbc3KeyGenerator.INSTANCE :
+                            NoKeyGenerator.INSTANCE;
+                } else { // <5.3> 如果有 @Options 注解，则使用该注解的配置处理
+                    keyGenerator = options.useGeneratedKeys() ? Jdbc3KeyGenerator.INSTANCE : NoKeyGenerator.INSTANCE;
+                    keyProperty = options.keyProperty();
+                    keyColumn = options.keyColumn();
+                }
+            } else {
+                keyGenerator = NoKeyGenerator.INSTANCE;
+            }
+            // <6> 初始化各种属性
+            if (options != null) {
+                if (FlushCachePolicy.TRUE.equals(options.flushCache())) {
+                    flushCache = true;
+                } else if (FlushCachePolicy.FALSE.equals(options.flushCache())) {
+                    flushCache = false;
+                }
+                useCache = options.useCache();
+                fetchSize = options.fetchSize() > -1 || options.fetchSize() == Integer.MIN_VALUE ?
+                        options.fetchSize() : null; //issue #348
+                timeout = options.timeout() > -1 ? options.timeout() : null;
+                statementType = options.statementType();
+                resultSetType = options.resultSetType();
+            }
+
+            // <7> 获得 resultMapId 编号字符串
+            String resultMapId = null;
+
+            // <7.1> 如果有 @ResultMap 注解，使用该注解为 resultMapId 属性
+            ResultMap resultMapAnnotation = method.getAnnotation(ResultMap.class);
+            if (resultMapAnnotation != null) {
+                String[] resultMaps = resultMapAnnotation.value();
+                StringBuilder sb = new StringBuilder();
+                for (String resultMap : resultMaps) {
+                    if (sb.length() > 0) {
+                        sb.append(",");
+                    }
+                    sb.append(resultMap);
+                }
+                resultMapId = sb.toString();
+            } else if (isSelect) { // <7.2> 如果无 @ResultMap 注解，解析其它注解，作为 resultMapId 属性
+                resultMapId = parseResultMap(method);
+            }
+
+            // 构建 MappedStatement 对象
+            assistant.addMappedStatement(
+                    mappedStatementId,
+                    sqlSource,
+                    statementType,
+                    sqlCommandType,
+                    fetchSize,
+                    timeout,
+                    // ParameterMapID
+                    null,
+                    parameterTypeClass,
+                    resultMapId,
+                    getReturnType(method), // 获得返回类型
+                    resultSetType,
+                    flushCache,
+                    useCache,
+                    // TODO gcode issue #577
+                    false,
+                    keyGenerator,
+                    keyProperty,
+                    keyColumn,
+                    // DatabaseID
+                    null,
+                    languageDriver,
+                    // ResultSets
+                    options != null ? nullOrEmpty(options.resultSets()) : null);
+        }
+    }
+
+    /**
+     * 获得 LanguageDriver 对象
+     * <p>
+     * 资料：https://www.jianshu.com/p/03642b807688
+     */
+    private LanguageDriver getLanguageDriver(Method method) {
+        // 解析 @Lang 注解，获得对应的类型
+        Lang lang = method.getAnnotation(Lang.class);
+        Class<? extends LanguageDriver> langClass = null;
+        if (lang != null) {
+            langClass = lang.value();
+        }
+        // 获得 LanguageDriver 对象
+        // 如果 langClass 为空，即无 @Lang 注解，则会使用默认 LanguageDriver 类型
+        return assistant.getLanguageDriver(langClass);
+    }
+
+    /**
+     * 获得参数的类型
+     */
+    private Class<?> getParameterType(Method method) {
+        Class<?> parameterType = null;
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        // 遍历参数类型数组
+        // 排除 RowBounds 和 ResultHandler 两种参数
+        // 1. 如果是多参数，则是 ParamMap 类型
+        // 2. 如果是单参数，则是该参数的类型
+        for (Class<?> currentParameterType : parameterTypes) {
+            if (!RowBounds.class.isAssignableFrom(currentParameterType) && !ResultHandler.class.isAssignableFrom(currentParameterType)) {
+                if (parameterType == null) {
+                    parameterType = currentParameterType;
+                } else {
+                    // issue #135
+                    // 是多参数，返回是 ParamMap 类型，还是单参数对应的类型
+                    parameterType = ParamMap.class;
+                }
+            }
+        }
+        return parameterType;
+    }
+
+    private Class<?> getReturnType(Method method) {
+        // 获得方法的返回类型
+        Class<?> returnType = method.getReturnType();
+
+        // 解析成对应的 Type
+        Type resolvedReturnType = TypeParameterResolver.resolveReturnType(method, type);
+
+        // 如果 Type 是 Class ，普通类
+        if (resolvedReturnType instanceof Class) {
+            returnType = (Class<?>) resolvedReturnType;
+
+            // 如果是数组类型，则使用 componentType
+            if (returnType.isArray()) {
+                returnType = returnType.getComponentType();
+            }
+            // gcode issue #508
+            // 如果返回类型是 void ，则尝试使用 @ResultType 注解
+            if (void.class.equals(returnType)) {
+                ResultType rt = method.getAnnotation(ResultType.class);
+                if (rt != null) {
+                    returnType = rt.value();
+                }
+            }
+        }
+
+        // 如果 Type 是 ParameterizedType ，泛型
+        else if (resolvedReturnType instanceof ParameterizedType) {
+            // 获得泛型 rawType
+            ParameterizedType parameterizedType = (ParameterizedType) resolvedReturnType;
+            Class<?> rawType = (Class<?>) parameterizedType.getRawType();
+
+            // 如果是 Collection 或者 Cursor 类型时
+            if (Collection.class.isAssignableFrom(rawType) || Cursor.class.isAssignableFrom(rawType)) {
+                // 获得 <> 中实际类型
+                Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
+                // 如果 actualTypeArguments 的大小为 1 ，进一步处理
+                if (actualTypeArguments != null && actualTypeArguments.length == 1) {
+                    Type returnTypeParameter = actualTypeArguments[0];
+                    // 如果是 Class ，则直接使用 Class
+                    if (returnTypeParameter instanceof Class<?>) {
+                        returnType = (Class<?>) returnTypeParameter;
+                    }
+                    // 如果是 ParameterizedType ，则获取 <> 中实际类型
+                    else if (returnTypeParameter instanceof ParameterizedType) {
+                        // (gcode issue #443) actual type can be a also a parameterized type
+                        returnType = (Class<?>) ((ParameterizedType) returnTypeParameter).getRawType();
+                    }
+                    // 如果是泛型数组类型，则获得 genericComponentType 对应的类
+                    else if (returnTypeParameter instanceof GenericArrayType) {
+                        Class<?> componentType =
+                                (Class<?>) ((GenericArrayType) returnTypeParameter).getGenericComponentType();
+                        // (gcode issue #525) support List<byte[]>
+                        returnType = Array.newInstance(componentType, 0).getClass();
+                    }
+                }
+            }
+            // 如果有 @MapKey 注解，并且是 Map 类型
+            else if (method.isAnnotationPresent(MapKey.class) && Map.class.isAssignableFrom(rawType)) {
+                // (gcode issue 504) Do not look into Maps if there is not MapKey annotation
+                // 获得 <> 中实际类型
+                Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
+
+                // 如果 actualTypeArguments 的大小为 2 ，进一步处理。
+                // 为什么是 2 ，因为 Map<K, V> 呀，有 K、V 两个泛型
+                if (actualTypeArguments != null && actualTypeArguments.length == 2) {
+
+                    // 处理 V 泛型
+                    Type returnTypeParameter = actualTypeArguments[1];
+                    if (returnTypeParameter instanceof Class<?>) {
+                        // 如果 V 泛型为 Class ，则直接使用 Class
+                        returnType = (Class<?>) returnTypeParameter;
+                    } else if (returnTypeParameter instanceof ParameterizedType) {
+                        // (gcode issue 443) actual type can be a also a parameterized type
+                        // 如果 V 泛型为 ParameterizedType ，则获取 <> 中实际类型
+                        returnType = (Class<?>) ((ParameterizedType) returnTypeParameter).getRawType();
+                    }
+                }
+            } else if (Optional.class.equals(rawType)) { // 如果是 Optional 类型时
+                // 获得 <> 中实际类型
+                Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
+
+                // 因为是 Optional<T> 类型，所以 actualTypeArguments 数组大小是一
+                Type returnTypeParameter = actualTypeArguments[0];
+                if (returnTypeParameter instanceof Class<?>) {
+                    // 如果 <T> 泛型为 Class ，则直接使用 Class
+                    returnType = (Class<?>) returnTypeParameter;
+                }
+            }
+        }
+
+        return returnType;
+    }
+
+    /**
+     * 根据方法上的注解生成 SqlSource
+     *
+     * @param method
+     * @param parameterType
+     * @param languageDriver
+     * @return SqlSource
+     */
+    private SqlSource getSqlSourceFromAnnotations(Method method, Class<?> parameterType,
+                                                  LanguageDriver languageDriver) {
+        try {
+            // <1.1> <1.2> 获得方法上的 SQL_ANNOTATION_TYPES 和 SQL_PROVIDER_ANNOTATION_TYPES 对应的类型
+            Class<? extends Annotation> sqlAnnotationType = getSqlAnnotationType(method);
+            Class<? extends Annotation> sqlProviderAnnotationType = getSqlProviderAnnotationType(method);
+
+            // // <2> 优先使用 SQL_ANNOTATION_TYPES 对应的类型
+            if (sqlAnnotationType != null) {
+                // 如果 SQL_PROVIDER_ANNOTATION_TYPES 对应的类型非空，则抛出 BindingException 异常，因为冲突了。
+                if (sqlProviderAnnotationType != null) {
+                    throw new BindingException("You cannot supply both a static SQL and SqlProvider to method named " + method.getName());
+                }
+                // <2.1> 获得 SQL_ANNOTATION_TYPES 对应的注解
+                Annotation sqlAnnotation = method.getAnnotation(sqlAnnotationType);
+
+                // <2.2> 获得 value 属性
+                final String[] strings = (String[]) sqlAnnotation.getClass().getMethod("value").invoke(sqlAnnotation);
+
+                // <2.3> 创建 SqlSource 对象
+                return buildSqlSourceFromStrings(strings, parameterType, languageDriver);
+            } else if (sqlProviderAnnotationType != null) { // <3> 如果 SQL_PROVIDER_ANNOTATION_TYPES 对应的类型非空
+                // <3.1> 获得 SQL_PROVIDER_ANNOTATION_TYPES 对应的注解
+                Annotation sqlProviderAnnotation = method.getAnnotation(sqlProviderAnnotationType);
+
+                // <3.2> 创建 ProviderSqlSource 对象
+                return new ProviderSqlSource(assistant.getConfiguration(), sqlProviderAnnotation, type, method);
+            }
+            // <4> 返回空
+            return null;
+        } catch (Exception e) {
+            throw new BuilderException("Could not find value method on SQL annotation.  Cause: " + e, e);
+        }
+    }
+
+    private SqlSource buildSqlSourceFromStrings(String[] strings, Class<?> parameterTypeClass,
+                                                LanguageDriver languageDriver) {
+        // <1> 拼接 SQL
+        final StringBuilder sql = new StringBuilder();
+        for (String fragment : strings) {
+            sql.append(fragment);
+            // 使用空格分隔
+            sql.append(" ");
+        }
+        // <2> 创建 SqlSource 对象
+        return languageDriver.createSqlSource(configuration, sql.toString().trim(), parameterTypeClass);
+    }
+
+    private SqlCommandType getSqlCommandType(Method method) {
+        Class<? extends Annotation> type = getSqlAnnotationType(method);
+
+        if (type == null) {
+            type = getSqlProviderAnnotationType(method);
+
+            if (type == null) {
+                return SqlCommandType.UNKNOWN;
+            }
+
+            if (type == SelectProvider.class) {
+                type = Select.class;
+            } else if (type == InsertProvider.class) {
+                type = Insert.class;
+            } else if (type == UpdateProvider.class) {
+                type = Update.class;
+            } else if (type == DeleteProvider.class) {
+                type = Delete.class;
+            }
+        }
+
+        return SqlCommandType.valueOf(type.getSimpleName().toUpperCase(Locale.ENGLISH));
+    }
+
+    /**
+     * 获得方法上的 SQL_ANNOTATION_TYPES 类型的注解类型
+     */
+    private Class<? extends Annotation> getSqlAnnotationType(Method method) {
+        return chooseAnnotationType(method, SQL_ANNOTATION_TYPES);
+    }
+
+    /**
+     * 获得方法上的 SQL_ANNOTATION_TYPES 类型的注解类型
+     */
+    private Class<? extends Annotation> getSqlProviderAnnotationType(Method method) {
+        return chooseAnnotationType(method, SQL_PROVIDER_ANNOTATION_TYPES);
+    }
+
+    /**
+     * 获得符合指定类型的注解类型
+     *
+     * @param method 方法
+     * @param types  指定类型
+     * @return 查到的注解类型
+     */
+    private Class<? extends Annotation> chooseAnnotationType(Method method, Set<Class<? extends Annotation>> types) {
+        for (Class<? extends Annotation> type : types) {
+            Annotation annotation = method.getAnnotation(type);
+            if (annotation != null) {
+                return type;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 将 @Result[] 注解数组，解析成对应的 ResultMapping 对象们，并添加到 resultMappings
+     */
+    private void applyResults(Result[] results, Class<?> resultType, List<ResultMapping> resultMappings) {
+        // 遍历 @Result[] 数组
+        for (Result result : results) {
+            // 创建 ResultFlag 数组
+            List<ResultFlag> flags = new ArrayList<>();
+            if (result.id()) {
+                flags.add(ResultFlag.ID);
+            }
+            // 获得 TypeHandler 类
+            @SuppressWarnings("unchecked")
+            Class<? extends TypeHandler<?>> typeHandler = (Class<? extends TypeHandler<?>>)
+                    ((result.typeHandler() == UnknownTypeHandler.class) ? null : result.typeHandler());
+            // 构建 ResultMapping 对象
+            ResultMapping resultMapping = assistant.buildResultMapping(
+                    resultType,
+                    nullOrEmpty(result.property()),
+                    nullOrEmpty(result.column()),
+                    result.javaType() == void.class ? null : result.javaType(),
+                    result.jdbcType() == JdbcType.UNDEFINED ? null : result.jdbcType(),
+                    hasNestedSelect(result) ? nestedSelectId(result) : null,
+                    null,
+                    null,
+                    null,
+                    typeHandler,
+                    flags,
+                    null,
+                    null,
+                    isLazy(result));
+
+            // 添加到 resultMappings 中
+            resultMappings.add(resultMapping);
+        }
+    }
+
+    private String nestedSelectId(Result result) {
+        // 先获得 @One 注解
+        String nestedSelect = result.one().select();
+        if (nestedSelect.length() < 1) {
+            // 获得不到，则再获得 @Many
+            nestedSelect = result.many().select();
+        }
+
+        // 获得内嵌查询编号，格式为 `{type.name}.${select}`
+        if (!nestedSelect.contains(".")) {
+            nestedSelect = type.getName() + "." + nestedSelect;
+        }
+        return nestedSelect;
+    }
+
+    /**
+     * 根据全局是否懒加载 + @One 或 @Many 注解。
+     */
+    private boolean isLazy(Result result) {
+        // 判断是否开启懒加载
+        boolean isLazy = configuration.isLazyLoadingEnabled();
+
+        // 如果有 @One 注解，则判断是否懒加载
+        if (result.one().select().length() > 0 && FetchType.DEFAULT != result.one().fetchType()) {
+            isLazy = result.one().fetchType() == FetchType.LAZY;
+        }
+        // 如果有 @Many 注解，则判断是否懒加载
+        else if (result.many().select().length() > 0 && FetchType.DEFAULT != result.many().fetchType()) {
+            isLazy = result.many().fetchType() == FetchType.LAZY;
+        }
+        return isLazy;
+    }
+
+    private boolean hasNestedSelect(Result result) {
+        if (result.one().select().length() > 0 && result.many().select().length() > 0) {
+            throw new BuilderException("Cannot use both @One and @Many annotations in the same @Result");
+        }
+        // 判断有 @One 或 @Many 注解
+        return result.one().select().length() > 0 || result.many().select().length() > 0;
+    }
+
+    /**
+     * @Arg[] 注解数组，解析成对应的 ResultMapping 对象们，并添加到 resultMappings 中
+     */
+    private void applyConstructorArgs(Arg[] args, Class<?> resultType, List<ResultMapping> resultMappings) {
+        // 遍历 @Arg[] 数组
+        for (Arg arg : args) {
+            // 创建 ResultFlag 数组
+            List<ResultFlag> flags = new ArrayList<>();
+            flags.add(ResultFlag.CONSTRUCTOR);
+            if (arg.id()) {
+                flags.add(ResultFlag.ID);
+            }
+            // 获得 TypeHandler
+            @SuppressWarnings("unchecked")
+            Class<? extends TypeHandler<?>> typeHandler = (Class<? extends TypeHandler<?>>)
+                    (arg.typeHandler() == UnknownTypeHandler.class ? null : arg.typeHandler());
+            // 将当前 @Arg 注解构建成 ResultMapping 对象
+            ResultMapping resultMapping = assistant.buildResultMapping(
+                    resultType,
+                    nullOrEmpty(arg.name()),
+                    nullOrEmpty(arg.column()),
+                    arg.javaType() == void.class ? null : arg.javaType(),
+                    arg.jdbcType() == JdbcType.UNDEFINED ? null : arg.jdbcType(),
+                    nullOrEmpty(arg.select()),
+                    nullOrEmpty(arg.resultMap()),
+                    null,
+                    nullOrEmpty(arg.columnPrefix()),
+                    typeHandler,
+                    flags,
+                    null,
+                    null,
+                    false);
+
+            // 添加到 resultMappings 中
+            resultMappings.add(resultMapping);
+        }
+    }
+
+    private String nullOrEmpty(String value) {
+        return value == null || value.trim().length() == 0 ? null : value;
+    }
+
+    private Result[] resultsIf(Results results) {
+        return results == null ? new Result[0] : results.value();
+    }
+
+    private Arg[] argsIf(ConstructorArgs args) {
+        return args == null ? new Arg[0] : args.value();
+    }
+
+    /**
+     * {@link SelectKey}
+     */
+    private KeyGenerator handleSelectKeyAnnotation(SelectKey selectKeyAnnotation, String baseStatementId,
+                                                   Class<?> parameterTypeClass, LanguageDriver languageDriver) {
+        // 获得各种属性和对应的类
+        String id = baseStatementId + SelectKeyGenerator.SELECT_KEY_SUFFIX;
+        Class<?> resultTypeClass = selectKeyAnnotation.resultType();
+        StatementType statementType = selectKeyAnnotation.statementType();
+        String keyProperty = selectKeyAnnotation.keyProperty();
+        String keyColumn = selectKeyAnnotation.keyColumn();
+        boolean executeBefore = selectKeyAnnotation.before();
+
+        // defaults
+        // 创建 MappedStatement 需要用到的默认值
+        boolean useCache = false;
+        KeyGenerator keyGenerator = NoKeyGenerator.INSTANCE;
+        Integer fetchSize = null;
+        Integer timeout = null;
+        boolean flushCache = false;
+        String parameterMap = null;
+        String resultMap = null;
+        ResultSetType resultSetTypeEnum = null;
+
+        // 创建 SqlSource 对象
+        SqlSource sqlSource = buildSqlSourceFromStrings(selectKeyAnnotation.statement(), parameterTypeClass,
+                languageDriver);
+        SqlCommandType sqlCommandType = SqlCommandType.SELECT;
+
+        // 创建 MappedStatement 对象
+        assistant.addMappedStatement(id, sqlSource, statementType, sqlCommandType, fetchSize, timeout, parameterMap,
+                parameterTypeClass, resultMap, resultTypeClass, resultSetTypeEnum,
+                flushCache, useCache, false,
+                keyGenerator, keyProperty, keyColumn, null, languageDriver, null);
+
+        // 获得 SelectKeyGenerator 的编号，格式为 `${namespace}.${id}`
+        id = assistant.applyCurrentNamespace(id, false);
+
+        // 获得 MappedStatement 对象
+        MappedStatement keyStatement = configuration.getMappedStatement(id, false);
+
+        // 创建 SelectKeyGenerator 对象，并添加到 configuration 中
+        SelectKeyGenerator answer = new SelectKeyGenerator(keyStatement, executeBefore);
+        configuration.addKeyGenerator(id, answer);
+        return answer;
+    }
 
 }

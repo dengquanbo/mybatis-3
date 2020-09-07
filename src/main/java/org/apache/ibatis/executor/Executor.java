@@ -1,17 +1,14 @@
 /**
- *    Copyright 2009-2015 the original author or authors.
- *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Copyright 2009-2015 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.ibatis.executor;
 
@@ -32,36 +29,87 @@ import org.apache.ibatis.transaction.Transaction;
  */
 public interface Executor {
 
-  ResultHandler NO_RESULT_HANDLER = null;
+    /**
+     * 空 ResultHandler 对象的枚举
+     */
+    ResultHandler NO_RESULT_HANDLER = null;
 
-  int update(MappedStatement ms, Object parameter) throws SQLException;
 
-  <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey cacheKey, BoundSql boundSql) throws SQLException;
+    /**
+     * 更新 or 插入 or 删除，由传入的 MappedStatement 的 SQL 所决定
+     */
+    int update(MappedStatement ms, Object parameter) throws SQLException;
 
-  <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler) throws SQLException;
 
-  <E> Cursor<E> queryCursor(MappedStatement ms, Object parameter, RowBounds rowBounds) throws SQLException;
+    /**
+     * 查询，带 ResultHandler + CacheKey + BoundSql
+     */
+    <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler,
+                      CacheKey cacheKey, BoundSql boundSql) throws SQLException;
 
-  List<BatchResult> flushStatements() throws SQLException;
+    /**
+     * 查询，带 ResultHandler
+     */
+    <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler) throws SQLException;
 
-  void commit(boolean required) throws SQLException;
+    /**
+     * 查询，返回值为 Cursor
+     */
+    <E> Cursor<E> queryCursor(MappedStatement ms, Object parameter, RowBounds rowBounds) throws SQLException;
 
-  void rollback(boolean required) throws SQLException;
+    /**
+     * 刷入批处理语句
+     */
+    List<BatchResult> flushStatements() throws SQLException;
 
-  CacheKey createCacheKey(MappedStatement ms, Object parameterObject, RowBounds rowBounds, BoundSql boundSql);
+    /**
+     * 提交事务
+     */
+    void commit(boolean required) throws SQLException;
 
-  boolean isCached(MappedStatement ms, CacheKey key);
+    /**
+     * 回滚事务
+     */
+    void rollback(boolean required) throws SQLException;
 
-  void clearLocalCache();
+    /**
+     * 创建 CacheKey 对象
+     */
+    CacheKey createCacheKey(MappedStatement ms, Object parameterObject, RowBounds rowBounds, BoundSql boundSql);
 
-  void deferLoad(MappedStatement ms, MetaObject resultObject, String property, CacheKey key, Class<?> targetType);
+    /**
+     * 判断是否缓存
+     */
+    boolean isCached(MappedStatement ms, CacheKey key);
 
-  Transaction getTransaction();
+    /**
+     * 清除本地缓存
+     */
+    void clearLocalCache();
 
-  void close(boolean forceRollback);
+    /**
+     * 延迟加载
+     */
+    void deferLoad(MappedStatement ms, MetaObject resultObject, String property, CacheKey key, Class<?> targetType);
 
-  boolean isClosed();
+    /**
+     * 获得事务
+     */
+    Transaction getTransaction();
 
-  void setExecutorWrapper(Executor executor);
+    /**
+     * 关闭事务
+     */
+    void close(boolean forceRollback);
+
+    /**
+     * 判断事务是否关闭
+     */
+    boolean isClosed();
+
+    /**
+     * 设置包装的 Executor 对象
+     */
+    void setExecutorWrapper(Executor executor);
 
 }

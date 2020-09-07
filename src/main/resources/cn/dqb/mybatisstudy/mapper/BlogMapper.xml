@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.dqb.mybatisstudy.mapper.BlogMapper">
+    <resultMap id="BookResultMap" type="cn.dqb.mybatisstudy.entity.Blog">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+    </resultMap>
+
+
+    <parameterMap type="cn.dqb.mybatisstudy.entity.Blog" id="BookParameterMap">
+        <parameter property="title" resultMap="BookResultMap"/>
+    </parameterMap>
+
+    <cache/>
+    <sql id="sql1"> id</sql>
+
+    <delete id="delRoleProfile" parameterType="int">
+        <![CDATA[
+           delete from fm_user_roleprofile  where id in
+        ]]>
+        <foreach collection="roleProfileIdList" index="index" item="item"
+                 open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </delete>
+
+    <select id="checkConflictDuty" resultType="int">
+        select count(1) from fm_user_on_duty
+        where
+        <![CDATA[
+             date_begin <= DATE_FORMAT(#{date},'%Y-%m-%d')
+            and date_end >= DATE_FORMAT(#{date},'%Y-%m-%d')
+            ]]>
+        <if test=" id != null">
+            and id != #{id}
+        </if>
+        and is_delete = 0
+    </select>
+
+    <select id="selectBlog" resultType="cn.dqb.mybatisstudy.entity.Blog">
+        select
+        *
+        from
+        Blog
+        <where>
+            id = #{id}
+        </where>
+    </select>
+
+    <insert id="addBlog">
+        <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Integer">
+            SELECT LAST_INSERT_ID()
+        </selectKey>
+        insert into blog values(1,2)
+    </insert>
+
+</mapper>

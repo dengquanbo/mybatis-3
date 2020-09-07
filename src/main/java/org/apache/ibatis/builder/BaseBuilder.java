@@ -1,17 +1,14 @@
 /**
- *    Copyright 2009-2018 the original author or authors.
- *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Copyright 2009-2018 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.ibatis.builder;
 
@@ -29,151 +26,172 @@ import org.apache.ibatis.type.TypeHandler;
 import org.apache.ibatis.type.TypeHandlerRegistry;
 
 /**
+ * 基础构造器抽象类，为子类提供通用的工具类
+ *
  * @author Clinton Begin
  */
 public abstract class BaseBuilder {
-	protected final Configuration configuration;
-	protected final TypeAliasRegistry typeAliasRegistry;
-	protected final TypeHandlerRegistry typeHandlerRegistry;
+    /**
+     * 配置文件后，对应的 java 对象，XML 和注解中解析到的配置
+     */
+    protected final Configuration configuration;
 
-	public BaseBuilder(Configuration configuration) {
-		this.configuration = configuration;
-		this.typeAliasRegistry = this.configuration.getTypeAliasRegistry();
-		this.typeHandlerRegistry = this.configuration.getTypeHandlerRegistry();
-	}
+    /**
+     * 类型别名注册器
+     */
+    protected final TypeAliasRegistry typeAliasRegistry;
 
-	public Configuration getConfiguration() {
-		return configuration;
-	}
+    /**
+     * 类型处理器注册器
+     */
+    protected final TypeHandlerRegistry typeHandlerRegistry;
 
-	/**
-	 * 创建正则表达式
-	 *
-	 * @param regex
-	 *            指定表达式
-	 * @param defaultValue
-	 *            默认表达式
-	 * @return 正则表达式
-	 */
-	protected Pattern parseExpression(String regex, String defaultValue) {
-		return Pattern.compile(regex == null ? defaultValue : regex);
-	}
+    public BaseBuilder(Configuration configuration) {
+        this.configuration = configuration;
 
-	/**
-	 * xxxValueOf(...) 方法，将字符串转换成对应的数据类型的值
-	 */
-	protected Boolean booleanValueOf(String value, Boolean defaultValue) {
-		return value == null ? defaultValue : Boolean.valueOf(value);
-	}
+        // 实际使用的是 Configuration 的属性：typeAliasRegistry 与 typeHandlerRegistry
+        this.typeAliasRegistry = this.configuration.getTypeAliasRegistry();
+        this.typeHandlerRegistry = this.configuration.getTypeHandlerRegistry();
+    }
 
-	protected Integer integerValueOf(String value, Integer defaultValue) {
-		return value == null ? defaultValue : Integer.valueOf(value);
-	}
+    public Configuration getConfiguration() {
+        return configuration;
+    }
 
-	protected Set<String> stringSetValueOf(String value, String defaultValue) {
-		value = (value == null ? defaultValue : value);
-		return new HashSet<>(Arrays.asList(value.split(",")));
-	}
+    /**
+     * 创建正则表达式
+     *
+     * @param regex        指定表达式
+     * @param defaultValue 默认表达式
+     * @return 正则表达式
+     */
+    protected Pattern parseExpression(String regex, String defaultValue) {
+        return Pattern.compile(regex == null ? defaultValue : regex);
+    }
 
-	/**
-	 * 解析对应的 JdbcType 类型
-	 */
-	protected JdbcType resolveJdbcType(String alias) {
-		if (alias == null) {
-			return null;
-		}
-		try {
-			return JdbcType.valueOf(alias);
-		} catch (IllegalArgumentException e) {
-			throw new BuilderException("Error resolving JdbcType. Cause: " + e, e);
-		}
-	}
+    /**
+     * xxxValueOf(...) 方法，将字符串转换成对应的数据类型的值
+     */
+    protected Boolean booleanValueOf(String value, Boolean defaultValue) {
+        return value == null ? defaultValue : Boolean.valueOf(value);
+    }
 
-	/**
-	 * 解析对应的 ResultSetType 类型
-	 */
-	protected ResultSetType resolveResultSetType(String alias) {
-		if (alias == null) {
-			return null;
-		}
-		try {
-			return ResultSetType.valueOf(alias);
-		} catch (IllegalArgumentException e) {
-			throw new BuilderException("Error resolving ResultSetType. Cause: " + e, e);
-		}
-	}
+    protected Integer integerValueOf(String value, Integer defaultValue) {
+        return value == null ? defaultValue : Integer.valueOf(value);
+    }
 
-	/**
-	 * 解析对应的 ParameterMode 类型
-	 */
-	protected ParameterMode resolveParameterMode(String alias) {
-		if (alias == null) {
-			return null;
-		}
-		try {
-			return ParameterMode.valueOf(alias);
-		} catch (IllegalArgumentException e) {
-			throw new BuilderException("Error resolving ParameterMode. Cause: " + e, e);
-		}
-	}
+    protected Set<String> stringSetValueOf(String value, String defaultValue) {
+        value = (value == null ? defaultValue : value);
+        return new HashSet<>(Arrays.asList(value.split(",")));
+    }
 
-	/**
-	 * 创建指定对象
-	 */
-	protected Object createInstance(String alias) {
-		Class<?> clazz = resolveClass(alias);
-		if (clazz == null) {
-			return null;
-		}
-		try {
-			return resolveClass(alias).newInstance();
-		} catch (Exception e) {
-			throw new BuilderException("Error creating instance. Cause: " + e, e);
-		}
-	}
+    /**
+     * 解析对应的 JdbcType 类型
+     */
+    protected JdbcType resolveJdbcType(String alias) {
+        if (alias == null) {
+            return null;
+        }
+        try {
+            return JdbcType.valueOf(alias);
+        } catch (IllegalArgumentException e) {
+            throw new BuilderException("Error resolving JdbcType. Cause: " + e, e);
+        }
+    }
 
-	protected <T> Class<? extends T> resolveClass(String alias) {
-		if (alias == null) {
-			return null;
-		}
-		try {
-			return resolveAlias(alias);
-		} catch (Exception e) {
-			throw new BuilderException("Error resolving class. Cause: " + e, e);
-		}
-	}
+    /**
+     * 解析对应的 ResultSetType 类型
+     */
+    protected ResultSetType resolveResultSetType(String alias) {
+        if (alias == null) {
+            return null;
+        }
+        try {
+            return ResultSetType.valueOf(alias);
+        } catch (IllegalArgumentException e) {
+            throw new BuilderException("Error resolving ResultSetType. Cause: " + e, e);
+        }
+    }
 
-	protected TypeHandler<?> resolveTypeHandler(Class<?> javaType, String typeHandlerAlias) {
-		if (typeHandlerAlias == null) {
-			return null;
-		}
-		// 判断 type 是否是TypeHandler 的子类，不是则抛出异常
-		Class<?> type = resolveClass(typeHandlerAlias);
-		if (type != null && !TypeHandler.class.isAssignableFrom(type)) {
-			throw new BuilderException("Type " + type.getName()
-					+ " is not a valid TypeHandler because it does not implement TypeHandler interface");
-		}
-		@SuppressWarnings("unchecked") // already verified it is a TypeHandler
-		Class<? extends TypeHandler<?>> typeHandlerType = (Class<? extends TypeHandler<?>>) type;
-		return resolveTypeHandler(javaType, typeHandlerType);
-	}
+    /**
+     * 解析对应的 ParameterMode 类型
+     */
+    protected ParameterMode resolveParameterMode(String alias) {
+        if (alias == null) {
+            return null;
+        }
+        try {
+            return ParameterMode.valueOf(alias);
+        } catch (IllegalArgumentException e) {
+            throw new BuilderException("Error resolving ParameterMode. Cause: " + e, e);
+        }
+    }
 
-	protected TypeHandler<?> resolveTypeHandler(Class<?> javaType, Class<? extends TypeHandler<?>> typeHandlerType) {
-		if (typeHandlerType == null) {
-			return null;
-		}
-		// javaType ignored for injected handlers see issue #746 for full detail
-		// 先获得 TypeHandler 对象
-		TypeHandler<?> handler = typeHandlerRegistry.getMappingTypeHandler(typeHandlerType);
-		// 如果不存在，进行创建 TypeHandler 对象
-		if (handler == null) {
-			// not in registry, create a new one
-			handler = typeHandlerRegistry.getInstance(javaType, typeHandlerType);
-		}
-		return handler;
-	}
+    /**
+     * 创建指定对象
+     */
+    protected Object createInstance(String alias) {
+        Class<?> clazz = resolveClass(alias);
+        if (clazz == null) {
+            return null;
+        }
+        try {
+            return resolveClass(alias).newInstance();
+        } catch (Exception e) {
+            throw new BuilderException("Error creating instance. Cause: " + e, e);
+        }
+    }
 
-	protected <T> Class<? extends T> resolveAlias(String alias) {
-		return typeAliasRegistry.resolveAlias(alias);
-	}
+    /**
+     * @param alias 别名
+     */
+    protected <T> Class<? extends T> resolveClass(String alias) {
+        if (alias == null) {
+            return null;
+        }
+        try {
+            return resolveAlias(alias);
+        } catch (Exception e) {
+            throw new BuilderException("Error resolving class. Cause: " + e, e);
+        }
+    }
+
+    protected TypeHandler<?> resolveTypeHandler(Class<?> javaType, String typeHandlerAlias) {
+        if (typeHandlerAlias == null) {
+            return null;
+        }
+        // 判断 type 是否是 TypeHandler 的子类，不是则抛出异常
+        Class<?> type = resolveClass(typeHandlerAlias);
+        if (type != null && !TypeHandler.class.isAssignableFrom(type)) {
+            throw new BuilderException("Type " + type.getName()
+                    + " is not a valid TypeHandler because it does not implement TypeHandler interface");
+        }
+        @SuppressWarnings("unchecked") // already verified it is a TypeHandler
+                Class<? extends TypeHandler<?>> typeHandlerType = (Class<? extends TypeHandler<?>>) type;
+        return resolveTypeHandler(javaType, typeHandlerType);
+    }
+
+    protected TypeHandler<?> resolveTypeHandler(Class<?> javaType, Class<? extends TypeHandler<?>> typeHandlerType) {
+        if (typeHandlerType == null) {
+            return null;
+        }
+        // javaType ignored for injected handlers see issue #746 for full detail
+        // 先获得 TypeHandler 对象
+        TypeHandler<?> handler = typeHandlerRegistry.getMappingTypeHandler(typeHandlerType);
+        // 如果不存在，进行创建 TypeHandler 对象
+        if (handler == null) {
+            // not in registry, create a new one
+            handler = typeHandlerRegistry.getInstance(javaType, typeHandlerType);
+        }
+        return handler;
+    }
+
+    /**
+     * 先从注册的别名缓存中拿，拿不到则直接加载类
+     *
+     * @param alias 别名
+     */
+    protected <T> Class<? extends T> resolveAlias(String alias) {
+        return typeAliasRegistry.resolveAlias(alias);
+    }
 }

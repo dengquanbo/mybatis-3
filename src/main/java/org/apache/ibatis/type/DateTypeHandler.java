@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2017 the original author or authors.
+ *    Copyright 2009-2019 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -23,43 +23,55 @@ import java.sql.Timestamp;
 import java.util.Date;
 
 /**
+ * Date 类型的 TypeHandler 实现类
+ *
+ * java.util.Date 和 java.sql.Timestamp 的互相转换
+ *
  * @author Clinton Begin
  */
 public class DateTypeHandler extends BaseTypeHandler<Date> {
 
-  @Override
-  public void setNonNullParameter(PreparedStatement ps, int i, Date parameter, JdbcType jdbcType)
-      throws SQLException {
-    ps.setTimestamp(i, new Timestamp(parameter.getTime()));
-  }
-
-  @Override
-  public Date getNullableResult(ResultSet rs, String columnName)
-      throws SQLException {
-    Timestamp sqlTimestamp = rs.getTimestamp(columnName);
-    if (sqlTimestamp != null) {
-      return new Date(sqlTimestamp.getTime());
+    @Override
+    public void setNonNullParameter(PreparedStatement ps, int i, Date parameter, JdbcType jdbcType)
+        throws SQLException {
+        // 将 Date 转换成 Timestamp 类型
+        // 然后设置到 ps 中
+        ps.setTimestamp(i, new Timestamp(parameter.getTime()));
     }
-    return null;
-  }
 
-  @Override
-  public Date getNullableResult(ResultSet rs, int columnIndex)
-      throws SQLException {
-    Timestamp sqlTimestamp = rs.getTimestamp(columnIndex);
-    if (sqlTimestamp != null) {
-      return new Date(sqlTimestamp.getTime());
+    @Override
+    public Date getNullableResult(ResultSet rs, String columnName)
+        throws SQLException {
+        // 获得 Timestamp 的值
+        Timestamp sqlTimestamp = rs.getTimestamp(columnName);
+        // 将 Timestamp 转换成 Date 类型
+        if (sqlTimestamp != null) {
+            return new Date(sqlTimestamp.getTime());
+        }
+        return null;
     }
-    return null;
-  }
 
-  @Override
-  public Date getNullableResult(CallableStatement cs, int columnIndex)
-      throws SQLException {
-    Timestamp sqlTimestamp = cs.getTimestamp(columnIndex);
-    if (sqlTimestamp != null) {
-      return new Date(sqlTimestamp.getTime());
+    @Override
+    public Date getNullableResult(ResultSet rs, int columnIndex)
+        throws SQLException {
+        // 获得 Timestamp 的值
+        Timestamp sqlTimestamp = rs.getTimestamp(columnIndex);
+        // 将 Timestamp 转换成 Date 类型
+        if (sqlTimestamp != null) {
+            return new Date(sqlTimestamp.getTime());
+        }
+        return null;
     }
-    return null;
-  }
+
+    @Override
+    public Date getNullableResult(CallableStatement cs, int columnIndex)
+        throws SQLException {
+        // 获得 Timestamp 的值
+        Timestamp sqlTimestamp = cs.getTimestamp(columnIndex);
+        // 将 Timestamp 转换成 Date 类型
+        if (sqlTimestamp != null) {
+            return new Date(sqlTimestamp.getTime());
+        }
+        return null;
+    }
 }
